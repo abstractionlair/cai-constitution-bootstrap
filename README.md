@@ -21,10 +21,10 @@ Implement and document a fully automated Constitutional AI training pipeline tha
 ## Technical Stack
 
 - **Model**: Qwen-2.5-32B base model
-- **Hardware**: RunPod A100 40GB GPU
+- **Hardware**: RunPod A100 SXM 80GB GPU
 - **Training**: QLoRA + DPO via Unsloth/TRL
 - **Safety**: Llama Guard 3-8B for content filtering
-- **Inference**: Quantizable to run on 24GB consumer GPUs
+- **Inference**: Flexible - can run at 4-bit, 8-bit, or 16-bit
 
 ## Project Structure
 
@@ -44,16 +44,23 @@ cai_experiment/
 
 ## Milestones
 
-1. **MVP Pipeline**: 100 preference pairs + validation
-2. **Scaled Generation**: 5k filtered pairs with safety checks
-3. **Full Training**: Complete alignment + benchmarks
-4. **Documentation**: Reproducible artifacts for publication
+### Progressive Bootstrapping (6 Stages)
+1. **Stage 1**: Explicit instruction following (foundation)
+2. **Stage 2**: Implicit instructions (questions & context)
+3. **Stage 3**: Generation tasks (create examples)
+4. **Stage 4**: Evaluation tasks (judge quality)
+5. **Stage 5**: Revision tasks (improve text)
+6. **Stage 6**: Constitutional integration (full CAI)
+
+Each stage produces a functional model that helps generate training data for the next stage.
 
 ## Budget
 
-- Target: $50-300 for complete experiment
-- ~30-50 hours of A100 40GB time
-- Cost optimization through iterative development
+- Target: $50-150 for complete experiment
+- Stages 1-5: ~$10-14 each (~$50-70 total)
+- Stage 6 (Constitutional): ~$20-30
+- Buffer for experimentation: ~$30-50
+- Total: Well within personal project range
 
 ## Safety & Ethics
 
