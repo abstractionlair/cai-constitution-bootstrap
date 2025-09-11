@@ -2,6 +2,10 @@
 
 An experiment in maximally automated Constitutional AI training, where a base model bootstraps its own alignment through self-critique and constitutional principles.
 
+## Status
+
+Work in progress.
+
 ## Project Goal
 
 Implement and document a fully automated Constitutional AI training pipeline that uses a base model (Qwen-2.5-32B) to:
