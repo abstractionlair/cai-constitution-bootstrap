@@ -36,6 +36,7 @@ We're building a maximally automated pipeline where a base model (Qwen-2.5-32B) 
 - Test what Qwen2.5-32B base can already do
 - Document starting capabilities (might be ~10-30%)
 - This tells us what we're actually teaching
+- **CRITICAL**: See BASE_MODEL_TRUTH.md for chat template contamination issues!
 
 **THEN**: Train for improvement
 1. Generate 500-1000 explicit instructions
@@ -101,6 +102,33 @@ scripts/
 └── evaluate.py              # Evaluation metrics
 ```
 
+## CRITICAL KNOWLEDGE - READ FIRST AFTER CONTEXT COMPACTION
+
+**ESSENTIAL FILES TO CHECK:**
+- `RUNPOD_SSH_SOLUTION.md` - Working SSH commands (stable proxy BROKEN, use direct SSH)
+- `POD_STATUS.md` - Current pod status and next tasks
+- `scripts/copy_to_pod.sh` - Working file transfer helper
+- `reviews/*/responses/20250912_*.md` - Latest technical and methodology review feedback
+- `tasks/claude_code/pending/20250912_*.md` - Critical fix tasks (P0 memory issue!)
+- Current training artifacts in `artifacts/` directory
+
+**KEY TECHNICAL DISCOVERIES:**
+1. **SSH Issue**: RunPod stable proxy (`tupdqnn4ka2obr-6441138e@ssh.runpod.io`) is broken despite documentation. Use direct SSH (`root@195.26.233.96 -p 48550`) with port updates after restarts.
+2. **Training Format**: Need consistent `Instruction: X\nResponse: Y\nEND` format with loss masking on response tokens only
+3. **DPO vs SFT**: DPO doesn't do token-level masking - need SFT first for proper loss masking, then DPO for preferences
+4. **Data Quality**: Current preference pairs have noise/critiques mixed in - need clean responses and diverse negatives
+5. **CRITICAL**: Evaluation script has memory management bug - loads all models concurrently (OOM risk + wrong results)
+
+**CURRENT IMPLEMENTATION STATUS:**
+- ✅ Base model response generation (100 examples)
+- ✅ A/B log-probability preference pair creation (188 pairs)
+- ✅ Simple DPO training (4.7 minutes on RunPod)
+- ✅ Held-out test instruction generation (130 examples)
+- ✅ **COMPLETE**: Full improved SFT→DPO pipeline implemented (6 scripts)
+- ✅ **COMPLETE**: Comprehensive Gemini + Codex reviews obtained
+- 🚨 **URGENT**: Fix P0 memory management issue in evaluation before RunPod testing
+- ⏳ **NEXT**: Apply review fixes, then test pipeline on RunPod
+
 ## Important Notes
 - This is for research/publication, not production
 - Prioritize reproducibility and clear documentation
@@ -123,16 +151,21 @@ scripts/
 
 ### SSH Credentials
 ```bash
-# RunPod SSH proxy (persistent across stop/start)
-HOST: ssh.runpod.io
-USER: tupdqnn4ka2obr-6441138e
+# IMPORTANT: The stable proxy DOES NOT WORK! Use direct SSH instead.
+# Direct SSH (port changes on restart - check RunPod dashboard):
+HOST: 195.26.233.96
+PORT: 48550  # UPDATE after pod restart!
+USER: root
 KEY: ~/.ssh/id_ed25519
 
-# For non-interactive commands (use -T flag):
-ssh -T tupdqnn4ka2obr-6441138e@ssh.runpod.io -i ~/.ssh/id_ed25519 'command here'
+# For file transfers (use SSH pipes, NOT scp):
+export RUNPOD_PORT=48550  # UPDATE THIS after pod restart!
+cat local_file | ssh -p $RUNPOD_PORT -i ~/.ssh/id_ed25519 root@195.26.233.96 'cat > /remote/path/file'
 
-# For interactive shell (no -T):
-ssh tupdqnn4ka2obr-6441138e@ssh.runpod.io -i ~/.ssh/id_ed25519
+# For commands:
+ssh -p $RUNPOD_PORT -i ~/.ssh/id_ed25519 root@195.26.233.96 'command here'
+
+# See RUNPOD_SSH_SOLUTION.md for full working examples and troubleshooting
 ```
 
 ### Task Tracking Workflow
@@ -201,21 +234,25 @@ python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
 
 2. **Transfer Files to RunPod**:
 ```bash
-# From local Mac, copy scripts to RunPod
-scp -i ~/.ssh/id_ed25519 -r /Users/scottmcguire/MaximalCAI/scripts/* \
-    tupdqnn4ka2obr-6441138e@ssh.runpod.io:/workspace/cai-constitution-bootstrap/scripts/
+# From local Mac, copy scripts to RunPod using SSH pipes (NOT scp!)
+export RUNPOD_PORT=48550  # UPDATE after pod restart!
 
-# Copy constitution
-scp -i ~/.ssh/id_ed25519 /Users/scottmcguire/MaximalCAI/constitution.yaml \
-    tupdqnn4ka2obr-6441138e@ssh.runpod.io:/workspace/cai-constitution-bootstrap/
+# Copy a script file
+cat /Users/scottmcguire/MaximalCAI/scripts/script.py | \
+    ssh -p $RUNPOD_PORT -i ~/.ssh/id_ed25519 root@195.26.233.96 \
+    'cat > /workspace/runs/stage1_20250911_131105/code/scripts/script.py'
+
+# Use the helper script for multiple files:
+bash /Users/scottmcguire/MaximalCAI/scripts/copy_to_pod.sh
 ```
 
 3. **Run Stage 1 Pipeline**:
 ```bash
-# SSH into RunPod
-ssh tupdqnn4ka2obr-6441138e@ssh.runpod.io -i ~/.ssh/id_ed25519
+# SSH into RunPod (use direct SSH with port)
+export RUNPOD_PORT=48550  # UPDATE after pod restart!
+ssh -p $RUNPOD_PORT -i ~/.ssh/id_ed25519 root@195.26.233.96
 
-cd /workspace/cai-constitution-bootstrap
+cd /workspace/runs/stage1_20250911_131105/code
 
 # First: Run baseline assessment
 python scripts/baseline_assessment.py
@@ -296,3 +333,51 @@ requests.post('https://api.runpod.io/graphql',
 7. **Before ending**: Stop pod and confirm data is saved
 
 Remember: The goal is maximum automation with minimal human intervention. Make it work end-to-end first, then optimize. Always be cost-conscious!
+
+## Critical Implementation Details for Context Preservation
+
+### SFT Data Generation Architecture
+**CRITICAL**: We implemented sophisticated few-shot completion-style prompting that GPT-5 correctly identified in our session logs.
+
+**Key Files**:
+- `scripts/utils/data_formatter.py` - Contains `CompletionStylePrompts` class with few-shot examples
+- `scripts/stage1_generate.py` - Uses CompletionStylePrompts correctly (line 196)
+- `scripts/generate_stage1_sft_data.py` - Has bug on line 402, stores wrong prompt format
+
+**Few-Shot Approach**:
+```python
+# Examples from CompletionStylePrompts.create_response_generation_prompt()
+examples = [
+    {'instruction': 'The answer to "What is 2+2?" is:', 'response': '4'},
+    {'instruction': 'Complete this sentence: The sun rises in the', 'response': 'east'},
+    {'instruction': 'Here is a fact about dogs:', 'response': 'Dogs are loyal...'},
+    # 3-4 examples randomly selected for each generation
+]
+```
+
+**Chat Template Contamination Fix (COMPLETED)**:
+```python
+# Line 130 in generate_stage1_sft_data.py
+self.tokenizer.chat_template = None  # Disable instruction templates
+
+# Line 273  
+add_special_tokens=False  # Prevent template injection
+```
+
+**Critical Bug to Fix**:
+Line 402 in `generate_stage1_sft_data.py` stores wrong prompt format:
+```python
+# WRONG - stores instruction format
+'prompt': f"Instruction: {inst_data['instruction']}\nResponse:",
+
+# SHOULD BE - store actual completion prompt used
+'prompt': self.create_completion_prompt(instruction, inst_type),
+```
+
+**Data Quality Status**:
+- ✅ Base model handling is clean (no chat template contamination)
+- ✅ Generated responses are high quality  
+- 🐛 Dataset stores wrong prompt format (cosmetic but should be fixed)
+- 📊 200 examples generated successfully for training
+
+See `DATA_GENERATION_ARCHITECTURE.md` for complete technical analysis.
