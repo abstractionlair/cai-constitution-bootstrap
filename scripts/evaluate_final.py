@@ -21,6 +21,9 @@ ARTIFACTS_DIR = BASE_DIR / "artifacts"
 CHECKPOINTS_DIR = BASE_DIR / "checkpoints"
 sys.path.insert(0, str(BASE_DIR / 'scripts'))
 
+# Import CleanModelLoader
+from utils.clean_model_loader import CleanModelLoader
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -125,106 +128,55 @@ class StrictInstructionFollowingEvaluator:
         return True, "Appropriate response"
 
 def load_base_model_only():
-    """Load just the base model"""
-    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-    
+    """Load just the base model via CleanModelLoader"""
     model_name = "Qwen/Qwen2.5-32B"
-    
+
     logger.info(f"Loading base model: {model_name}")
-    logger.info("🚨 DISABLING CHAT TEMPLATE for true base model evaluation")
-    
-    # Load tokenizer and DISABLE chat template
-    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    
-    # CRITICAL: Disable chat template entirely
-    tokenizer.chat_template = None
-    logger.info("✅ Chat template disabled")
-    
-    # Use BitsAndBytesConfig
-    bnb_config = BitsAndBytesConfig(
-        load_in_8bit=True,
-        llm_int8_threshold=6.0,
-        llm_int8_has_fp16_weight=False
-    )
-    
-    # Load base model
-    base_model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        quantization_config=bnb_config,
-        device_map="auto",
-        trust_remote_code=True,
-        low_cpu_mem_usage=True
-    )
-    
+
+    loader = CleanModelLoader(model_name, load_in_8bit=True)
+    base_model, tokenizer, provenance = loader.load()
+
+    logger.info(f"📋 Loader version: {provenance['loader_version'][:8]}")
     logger.info("✅ Base model loaded (8-bit, no chat template)")
-    
-    return base_model, tokenizer
+
+    return base_model, tokenizer, loader
 
 def load_trained_model_only():
     """Load just the trained model with LoRA adapter"""
-    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
     from peft import PeftModel
-    
+
     model_name = "Qwen/Qwen2.5-32B"
-    
+
     logger.info("Loading DPO-trained model with LoRA adapter...")
-    
-    # Load tokenizer (same setup as base)
-    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.chat_template = None
-    
-    # Use BitsAndBytesConfig
-    bnb_config = BitsAndBytesConfig(
-        load_in_8bit=True,
-        llm_int8_threshold=6.0,
-        llm_int8_has_fp16_weight=False
-    )
-    
-    # Load base model for LoRA
-    trained_base_model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        quantization_config=bnb_config,
-        device_map="auto",
-        trust_remote_code=True,
-        low_cpu_mem_usage=True
-    )
-    
+
+    # Load base model via CleanModelLoader
+    loader = CleanModelLoader(model_name, load_in_8bit=True)
+    trained_base_model, tokenizer, provenance = loader.load()
+
+    logger.info(f"📋 Loader version: {provenance['loader_version'][:8]}")
+
     # Load LoRA adapter
     lora_path = CHECKPOINTS_DIR / "stage1_dpo_final"
     trained_model = PeftModel.from_pretrained(trained_base_model, str(lora_path))
-    
-    logger.info("✅ Trained model loaded with LoRA adapter")
-    
-    return trained_model, tokenizer
 
-def generate_response_raw(model, tokenizer, instruction, max_new_tokens=150):
-    """Generate response using RAW instruction (no formatting, no chat template)"""
-    
+    logger.info("✅ Trained model loaded with LoRA adapter")
+
+    return trained_model, tokenizer, loader
+
+def generate_response_raw(model, tokenizer, loader, instruction, max_new_tokens=150):
+    """Generate response using CleanModelLoader"""
     # Raw instruction - no formatting whatsoever
     prompt = instruction
-    
-    # Use encode() instead of __call__ to completely bypass any template processing
-    input_ids = tokenizer.encode(prompt, return_tensors="pt")
-    input_ids = input_ids.to(model.device)
-    
-    with torch.no_grad():
-        outputs = model.generate(
-            input_ids,
-            max_new_tokens=max_new_tokens,
-            temperature=0.1,
-            do_sample=False,  # Deterministic
-            pad_token_id=tokenizer.eos_token_id,
-            eos_token_id=tokenizer.eos_token_id
-        )
-    
-    # Decode only the new tokens
-    new_tokens = outputs[0][input_ids.shape[1]:]
-    response = tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
-    
+
+    response = loader.generate(
+        model,
+        tokenizer,
+        prompt,
+        max_new_tokens=max_new_tokens,
+        temperature=0.1,
+        do_sample=False  # Deterministic
+    )
+
     return response
 
 def load_held_out_test_instructions():
@@ -261,23 +213,23 @@ def evaluate_models_on_heldout(test_instructions):
     
     # First pass: Base model evaluation
     logger.info("🔥 EVALUATING BASE MODEL")
-    base_model, tokenizer = load_base_model_only()
-    
+    base_model, tokenizer, base_loader = load_base_model_only()
+
     base_results = []
-    
+
     for i, instruction_data in enumerate(test_instructions):
         instruction = instruction_data['instruction']
         instruction_type = instruction_data['instruction_type']
-        
+
         if i % 10 == 0:
             logger.info(f"Base model: {i+1}/{len(test_instructions)}")
-        
+
         # Generate response from base model
-        response = generate_response_raw(base_model, tokenizer, instruction)
-        
+        response = generate_response_raw(base_model, tokenizer, base_loader, instruction)
+
         # Strict evaluation
         success, reason = evaluator.evaluate_response(instruction, response, instruction_type)
-        
+
         base_results.append({
             'instruction': instruction,
             'instruction_type': instruction_type,
@@ -286,31 +238,31 @@ def evaluate_models_on_heldout(test_instructions):
             'reason': reason,
             'id': instruction_data['id']
         })
-    
+
     # Clean up base model
     del base_model
     torch.cuda.empty_cache()
     logger.info("✅ Base model evaluation complete, GPU memory cleared")
-    
+
     # Second pass: Trained model evaluation
-    logger.info("🚀 EVALUATING TRAINED MODEL")  
-    trained_model, tokenizer = load_trained_model_only()
-    
+    logger.info("🚀 EVALUATING TRAINED MODEL")
+    trained_model, tokenizer, trained_loader = load_trained_model_only()
+
     trained_results = []
-    
+
     for i, instruction_data in enumerate(test_instructions):
         instruction = instruction_data['instruction']
         instruction_type = instruction_data['instruction_type']
-        
+
         if i % 10 == 0:
             logger.info(f"Trained model: {i+1}/{len(test_instructions)}")
-        
+
         # Generate response from trained model
-        response = generate_response_raw(trained_model, tokenizer, instruction)
-        
+        response = generate_response_raw(trained_model, tokenizer, trained_loader, instruction)
+
         # Strict evaluation
         success, reason = evaluator.evaluate_response(instruction, response, instruction_type)
-        
+
         trained_results.append({
             'instruction': instruction,
             'instruction_type': instruction_type,

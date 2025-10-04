@@ -16,12 +16,10 @@ import os
 from dataclasses import dataclass, field
 from datasets import Dataset
 from transformers import (
-    AutoModelForCausalLM,
     AutoTokenizer,
     TrainingArguments,
     DataCollatorForLanguageModeling,
-    Trainer,
-    BitsAndBytesConfig
+    Trainer
 )
 from peft import LoraConfig, get_peft_model, TaskType
 
@@ -34,6 +32,9 @@ BASE_DIR = Path(os.getenv('CAI_BASE_DIR', '/workspace/runs/stage1_20250911_13110
 ARTIFACTS_DIR = BASE_DIR / "artifacts"
 CHECKPOINTS_DIR = BASE_DIR / "checkpoints"
 sys.path.insert(0, str(BASE_DIR / 'scripts'))
+
+# Import CleanModelLoader
+from utils.clean_model_loader import CleanModelLoader
 
 # Import validation utilities
 from utils.data_validation import load_and_validate_sft_data
@@ -187,39 +188,11 @@ def setup_model_and_tokenizer(config: SFTConfig):
     
     logger.info(f"🔧 Setting up model: {config.model_name}")
     
-    # Quantization config
-    bnb_config = BitsAndBytesConfig(
-        load_in_8bit=config.load_in_8bit,
-        bnb_8bit_use_double_quant=True,
-        bnb_8bit_quant_type="nf8",
-        bnb_8bit_compute_dtype=torch.bfloat16
-    )
-    
-    # Load tokenizer
-    logger.info("📝 Loading tokenizer...")
-    tokenizer = AutoTokenizer.from_pretrained(
-        config.model_name,
-        trust_remote_code=True,
-        padding_side='right'
-    )
-    
-    # Disable chat template to ensure base model behavior
-    tokenizer.chat_template = None
-    
-    # Add special tokens if needed
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    
-    # Load model
+    # Load model via CleanModelLoader
     logger.info("🤖 Loading model with 8-bit quantization...")
-    model = AutoModelForCausalLM.from_pretrained(
-        config.model_name,
-        quantization_config=bnb_config,
-        device_map="auto",
-        trust_remote_code=True,
-        dtype=torch.bfloat16,
-        attn_implementation="flash_attention_2"
-    )
+    loader = CleanModelLoader(config.model_name, load_in_8bit=config.load_in_8bit)
+    model, tokenizer, provenance = loader.load()
+    logger.info(f"📋 Loader version: {provenance['loader_version'][:8]}")
     
     # Setup LoRA
     logger.info("🔧 Setting up LoRA adapters...")

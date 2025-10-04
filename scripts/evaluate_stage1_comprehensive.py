@@ -9,13 +9,16 @@ import time
 import json
 import logging
 from pathlib import Path
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from peft import PeftModel
 import sys
 import os
 from datetime import datetime
 from typing import Dict, List, Tuple, Any
 import re
+
+# Add utils to path
+sys.path.insert(0, str(Path(__file__).parent))
+from utils.clean_model_loader import CleanModelLoader
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -36,120 +39,71 @@ class ComprehensiveEvaluator:
     
     def __init__(self):
         self.base_model = None
-        self.sft_model = None 
+        self.sft_model = None
         self.dpo_model = None
         self.tokenizer = None
-        
+        self.loader = None
+
         # Test categories and scoring
         self.test_categories = {
             'core_instruction_following': 25,
             'format_compliance': 10,
             'edge_cases': 10
         }
-        
+
         # Scoring dimensions (0-2 points each)
         self.scoring_dimensions = ['instruction_following', 'coherence', 'relevance', 'quality']
         self.max_total_score = sum(self.test_categories.values()) * len(self.scoring_dimensions) * 2  # 360 points
-        
+
         logger.info(f"🎯 Initialized comprehensive evaluator (max score: {self.max_total_score})")
         
     def load_models(self):
-        """Load base, SFT, and DPO models for comparison"""
+        """Load base, SFT, and DPO models for comparison via CleanModelLoader"""
         logger.info("🤖 Loading models for comprehensive evaluation...")
-        
-        # Quantization config for memory efficiency
-        bnb_config = BitsAndBytesConfig(
-            load_in_8bit=True,
-            bnb_8bit_use_double_quant=True,
-            bnb_8bit_quant_type="nf8",
-            bnb_8bit_compute_dtype=torch.bfloat16
-        )
-        
-        # Load tokenizer
-        logger.info("📝 Loading tokenizer...")
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            "Qwen/Qwen2.5-32B",
-            trust_remote_code=True,
-            padding_side='right'
-        )
-        
-        # Disable chat template - use raw base model
-        self.tokenizer.chat_template = None
-        
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
-            
-        # Load base model
+
+        # Load base model via CleanModelLoader
         logger.info("🔵 Loading base model...")
-        self.base_model = AutoModelForCausalLM.from_pretrained(
-            "Qwen/Qwen2.5-32B",
-            quantization_config=bnb_config,
-            device_map="auto",
-            trust_remote_code=True,
-            dtype=torch.bfloat16,
-            attn_implementation="flash_attention_2"
-        )
-        
-        # Load SFT model (SEPARATE base + SFT LoRA - don't contaminate base_model!)
+        self.loader = CleanModelLoader("Qwen/Qwen2.5-32B", load_in_8bit=True)
+        self.base_model, self.tokenizer, provenance = self.loader.load()
+        logger.info(f"📋 Loader version: {provenance['loader_version'][:8]}")
+
+        # Load SFT model (SEPARATE base + SFT LoRA)
         logger.info("🟡 Loading SFT model...")
-        sft_base = AutoModelForCausalLM.from_pretrained(
-            "Qwen/Qwen2.5-32B",
-            quantization_config=bnb_config,
-            device_map="auto",
-            trust_remote_code=True,
-            dtype=torch.bfloat16,
-            attn_implementation="flash_attention_2"
-        )
+        sft_loader = CleanModelLoader("Qwen/Qwen2.5-32B", load_in_8bit=True)
+        sft_base, _, _ = sft_loader.load()
         self.sft_model = PeftModel.from_pretrained(sft_base, str(SFT_CHECKPOINT))
-        
+
         # Load DPO model (base + merged SFT + DPO LoRA)
         logger.info("🟢 Loading DPO model...")
-        # For DPO model, we need to load base, merge SFT, then add DPO
-        dpo_base = AutoModelForCausalLM.from_pretrained(
-            "Qwen/Qwen2.5-32B",
-            quantization_config=bnb_config,
-            device_map="auto",
-            trust_remote_code=True,
-            dtype=torch.bfloat16,
-            attn_implementation="flash_attention_2"
-        )
-        
+        dpo_loader = CleanModelLoader("Qwen/Qwen2.5-32B", load_in_8bit=True)
+        dpo_base, _, _ = dpo_loader.load()
+
         # Load and merge SFT first
         sft_for_dpo = PeftModel.from_pretrained(dpo_base, str(SFT_CHECKPOINT))
         sft_merged = sft_for_dpo.merge_and_unload()
-        
+
         # Then load DPO adapters on top
         self.dpo_model = PeftModel.from_pretrained(sft_merged, str(DPO_CHECKPOINT))
-        
+
         logger.info("✅ All models loaded successfully")
     
     def generate_response(self, model, instruction: str, max_length: int = 150) -> str:
-        """Generate response for an instruction using specified model"""
+        """Generate response for an instruction using CleanModelLoader"""
         # Format exactly like training data
         prompt = f"Instruction: {instruction}\nResponse:"
-        
-        inputs = self.tokenizer(
+
+        response = self.loader.generate(
+            model,
+            self.tokenizer,
             prompt,
-            return_tensors="pt",
-            truncation=True,
-            max_length=256
-        ).to(model.device)
-        
-        with torch.no_grad():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=max_length,
-                temperature=0.7,
-                do_sample=True,
-                pad_token_id=self.tokenizer.pad_token_id,
-                eos_token_id=self.tokenizer.eos_token_id,
-                repetition_penalty=1.1
-            )
-        
-        # Decode only the new tokens
-        response = self.tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:], skip_special_tokens=True)
+            max_new_tokens=max_length,
+            temperature=0.7,
+            do_sample=True,
+            stop_strings=["END", "\n\n", "Instruction:"]
+        )
+
         response = response.strip()
-        
+
         # Clean up response - stop at END token or double newlines
         if "END" in response:
             response = response.split("END")[0].strip()
@@ -157,7 +111,7 @@ class ComprehensiveEvaluator:
             response = response.split("\n\n")[0].strip()
         if "Instruction:" in response:
             response = response.split("Instruction:")[0].strip()
-            
+
         return response
     
     def score_response(self, instruction: str, response: str, expected_behavior: str) -> Dict[str, int]:

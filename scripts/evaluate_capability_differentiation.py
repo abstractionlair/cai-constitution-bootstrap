@@ -12,7 +12,6 @@ import time
 import re
 import csv
 from pathlib import Path
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from peft import PeftModel
 import sys
 import os
@@ -20,6 +19,10 @@ from datetime import datetime
 from typing import Dict, List, Tuple, Any
 import numpy as np
 import statistics
+
+# Add utils to path
+sys.path.insert(0, str(Path(__file__).parent))
+from utils.clean_model_loader import CleanModelLoader
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -41,10 +44,11 @@ class CapabilityDifferentiationEvaluator:
     def __init__(self):
         self.models = {}
         self.tokenizer = None
-        
+        self.loader = None
+
         # Test temperatures
         self.temperatures = [0.1, 0.5, 0.9]
-        
+
         # Scoring dimensions
         self.score_dimensions = [
             'completion',     # Natural pattern completion
@@ -54,76 +58,35 @@ class CapabilityDifferentiationEvaluator:
             'deflection',     # Avoiding/refusing task (inverted - lower is better)
             'continuation'    # Just extending prompt (inverted - lower is better)
         ]
-        
+
         logger.info("🎯 Initialized Capability Differentiation Evaluator")
     
     def load_models(self):
-        """Load base, SFT, and DPO models"""
+        """Load base, SFT, and DPO models via CleanModelLoader"""
         logger.info("🤖 Loading models for capability differentiation...")
-        
-        # Quantization config
-        bnb_config = BitsAndBytesConfig(
-            load_in_8bit=True,
-            bnb_8bit_use_double_quant=True,
-            bnb_8bit_quant_type="nf8",
-            bnb_8bit_compute_dtype=torch.bfloat16
-        )
-        
-        # Load tokenizer
-        logger.info("📝 Loading tokenizer...")
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            "Qwen/Qwen2.5-32B",
-            trust_remote_code=True,
-            padding_side='right'
-        )
-        
-        # CRITICAL: Disable chat template to prevent contamination
-        self.tokenizer.chat_template = None
-        if hasattr(self.tokenizer, 'default_chat_template'):
-            self.tokenizer.default_chat_template = None
-        
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
-        
+
         # Load base model
         logger.info("🔵 Loading base model...")
-        self.models['base'] = AutoModelForCausalLM.from_pretrained(
-            "Qwen/Qwen2.5-32B",
-            quantization_config=bnb_config,
-            device_map="auto",
-            trust_remote_code=True,
-            dtype=torch.bfloat16,
-            attn_implementation="flash_attention_2"
-        )
-        
+        self.loader = CleanModelLoader("Qwen/Qwen2.5-32B", load_in_8bit=True)
+        self.models['base'], self.tokenizer, provenance = self.loader.load()
+        logger.info(f"📋 Loader version: {provenance['loader_version'][:8]}")
+
         # Load SFT model (separate instance to prevent contamination)
         logger.info("🟡 Loading SFT model...")
-        sft_base = AutoModelForCausalLM.from_pretrained(
-            "Qwen/Qwen2.5-32B",
-            quantization_config=bnb_config,
-            device_map="auto",
-            trust_remote_code=True,
-            dtype=torch.bfloat16,
-            attn_implementation="flash_attention_2"
-        )
+        sft_loader = CleanModelLoader("Qwen/Qwen2.5-32B", load_in_8bit=True)
+        sft_base, _, _ = sft_loader.load()
         self.models['sft'] = PeftModel.from_pretrained(sft_base, str(SFT_CHECKPOINT))
-        
+
         # Load DPO model (separate instance)
         logger.info("🟢 Loading DPO model...")
-        dpo_base = AutoModelForCausalLM.from_pretrained(
-            "Qwen/Qwen2.5-32B",
-            quantization_config=bnb_config,
-            device_map="auto",
-            trust_remote_code=True,
-            dtype=torch.bfloat16,
-            attn_implementation="flash_attention_2"
-        )
+        dpo_loader = CleanModelLoader("Qwen/Qwen2.5-32B", load_in_8bit=True)
+        dpo_base, _, _ = dpo_loader.load()
         self.models['dpo'] = PeftModel.from_pretrained(dpo_base, str(DPO_CHECKPOINT))
-        
+
         # Set all models to eval mode
         for model in self.models.values():
             model.eval()
-        
+
         logger.info("✅ All models loaded successfully")
     
     def create_test_suite(self) -> List[Dict[str, Any]]:
@@ -362,42 +325,24 @@ class CapabilityDifferentiationEvaluator:
         return tests
     
     def generate_response(self, model: Any, prompt: str, temperature: float = 0.7) -> str:
-        """Generate response with contamination prevention"""
-        
-        # Tokenize with add_special_tokens=False to prevent template contamination
-        inputs = self.tokenizer(
+        """Generate response using CleanModelLoader"""
+        response = self.loader.generate(
+            model,
+            self.tokenizer,
             prompt,
-            add_special_tokens=False,  # CRITICAL: Prevents template application
-            return_tensors="pt",
-            max_length=256,
-            truncation=True,
-            padding=False
-        ).to(model.device)
-        
-        # Generate response
-        with torch.no_grad():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=100,  # Shorter responses for faster evaluation
-                temperature=temperature,
-                do_sample=temperature > 0.0,
-                top_p=0.9 if temperature > 0.0 else None,
-                repetition_penalty=1.1,
-                eos_token_id=self.tokenizer.eos_token_id,
-                pad_token_id=self.tokenizer.eos_token_id
-            )
-        
-        # Decode only new tokens
-        input_length = inputs['input_ids'].shape[1]
-        generated_tokens = outputs[0][input_length:]
-        response = self.tokenizer.decode(generated_tokens, skip_special_tokens=True).strip()
-        
+            max_new_tokens=100,  # Shorter responses for faster evaluation
+            temperature=temperature,
+            do_sample=temperature > 0.0,
+            top_p=0.9 if temperature > 0.0 else None,
+            stop_strings=["END", "\n\n"]
+        )
+
         # Clean response
         if "END" in response:
             response = response.split("END")[0].strip()
         if "\n\n" in response:
             response = response.split("\n\n")[0].strip()
-        
+
         return response
     
     def score_response(self, prompt: str, response: str, expected_capability: str) -> Dict[str, float]:

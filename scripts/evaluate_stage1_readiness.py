@@ -9,12 +9,15 @@ import torch
 import json
 import time
 from pathlib import Path
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from peft import PeftModel
 import sys
 import os
 from typing import List, Dict, Any
 from datetime import datetime
+
+# Add utils to path
+sys.path.insert(0, str(Path(__file__).parent))
+from utils.clean_model_loader import CleanModelLoader
 
 # Setup paths
 BASE_DIR = Path(os.getenv('CAI_BASE_DIR', '/workspace/runs/stage1_20250911_131105/code'))
@@ -27,6 +30,7 @@ class Stage1ReadinessEvaluator:
     def __init__(self):
         self.models = {}
         self.tokenizer = None
+        self.loader = None
         self.results = {}
         
         # Stage 2 readiness criteria: tasks the model MUST handle well
@@ -113,93 +117,54 @@ class Stage1ReadinessEvaluator:
         }
     
     def load_models(self):
-        """Load base, SFT, and DPO models for comparison"""
+        """Load base, SFT, and DPO models for comparison via CleanModelLoader"""
         print("🔧 Loading models for evaluation...")
-        
-        # Configure quantization
-        bnb_config = BitsAndBytesConfig(
-            load_in_8bit=True,
-            bnb_8bit_use_double_quant=True,
-            bnb_8bit_quant_type="nf8",
-            bnb_8bit_compute_dtype=torch.bfloat16
-        )
-        
-        # Load tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            "Qwen/Qwen2.5-32B",
-            trust_remote_code=True,
-            padding_side='right'
-        )
-        self.tokenizer.chat_template = None
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
-        
-        # Load base model
+
+        # Load base model via CleanModelLoader
         print("  Loading base model...")
-        self.models['base'] = AutoModelForCausalLM.from_pretrained(
-            "Qwen/Qwen2.5-32B",
-            quantization_config=bnb_config,
-            device_map="auto",
-            trust_remote_code=True,
-            dtype=torch.bfloat16
-        )
-        
+        self.loader = CleanModelLoader("Qwen/Qwen2.5-32B", load_in_8bit=True)
+        self.models['base'], self.tokenizer, provenance = self.loader.load()
+        print(f"📋 Loader version: {provenance['loader_version'][:8]}")
+
         # Load SFT model
         sft_path = CHECKPOINTS_DIR / "stage1_sft/final"
         if sft_path.exists():
             print("  Loading SFT model...")
-            self.models['sft'] = PeftModel.from_pretrained(
-                self.models['base'], str(sft_path)
-            )
-        
+            sft_loader = CleanModelLoader("Qwen/Qwen2.5-32B", load_in_8bit=True)
+            sft_base, _, _ = sft_loader.load()
+            self.models['sft'] = PeftModel.from_pretrained(sft_base, str(sft_path))
+
         # Load DPO model
         dpo_path = CHECKPOINTS_DIR / "stage1_dpo_improved/final"
         if dpo_path.exists():
             print("  Loading DPO model...")
             # For DPO, we need the merged SFT base + DPO LoRA
-            base_for_dpo = AutoModelForCausalLM.from_pretrained(
-                "Qwen/Qwen2.5-32B",
-                quantization_config=bnb_config,
-                device_map="auto",
-                trust_remote_code=True,
-                dtype=torch.bfloat16
-            )
+            dpo_loader = CleanModelLoader("Qwen/Qwen2.5-32B", load_in_8bit=True)
+            base_for_dpo, _, _ = dpo_loader.load()
+
             # Load SFT first, then DPO
             sft_model = PeftModel.from_pretrained(base_for_dpo, str(sft_path))
             merged_sft = sft_model.merge_and_unload()
             self.models['dpo'] = PeftModel.from_pretrained(merged_sft, str(dpo_path))
-        
+
         print(f"✅ Loaded {len(self.models)} models for comparison")
     
     def generate_response(self, model, instruction: str, max_length: int = 150) -> str:
-        """Generate response from a model"""
+        """Generate response from a model using CleanModelLoader"""
         # Format like training data
         prompt = f"Instruction: {instruction}\nResponse:"
-        
-        inputs = self.tokenizer(
+
+        response = self.loader.generate(
+            model,
+            self.tokenizer,
             prompt,
-            return_tensors="pt",
-            truncation=True,
-            max_length=256
-        ).to(model.device)
-        
-        with torch.no_grad():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=max_length,
-                temperature=0.7,
-                do_sample=True,
-                top_p=0.9,
-                pad_token_id=self.tokenizer.pad_token_id,
-                eos_token_id=self.tokenizer.eos_token_id,
-                repetition_penalty=1.1
-            )
-        
-        # Decode only the new tokens
-        response = self.tokenizer.decode(
-            outputs[0][inputs['input_ids'].shape[1]:], 
-            skip_special_tokens=True
+            max_new_tokens=max_length,
+            temperature=0.7,
+            do_sample=True,
+            top_p=0.9,
+            stop_strings=["END"]
         )
+
         return response.strip().split("END")[0].strip()
     
     def evaluate_response_quality(self, response: str, test_case: Dict[str, Any]) -> Dict[str, Any]:

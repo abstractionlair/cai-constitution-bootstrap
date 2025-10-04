@@ -14,7 +14,7 @@ from datetime import datetime
 from tqdm import tqdm
 import sys
 import os
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoTokenizer
 from peft import PeftModel
 
 # Setup logging
@@ -26,6 +26,9 @@ BASE_DIR = Path(os.getenv('CAI_BASE_DIR', '/workspace/runs/stage1_20250911_13110
 ARTIFACTS_DIR = BASE_DIR / "artifacts"
 CHECKPOINTS_DIR = BASE_DIR / "checkpoints"
 sys.path.insert(0, str(BASE_DIR / 'scripts'))
+
+# Import CleanModelLoader
+from utils.clean_model_loader import CleanModelLoader
 
 # Import validation utilities  
 from utils.data_validation import load_and_validate_sft_data, load_and_validate_negatives
@@ -52,73 +55,36 @@ class PreferencePairCreator:
         logger.info(f"🔧 Loading SFT model from {self.sft_model_path}")
         
         # Quantization config
-        bnb_config = BitsAndBytesConfig(
-            load_in_8bit=True,
-            bnb_8bit_use_double_quant=True,
-            bnb_8bit_quant_type="nf8",
-            bnb_8bit_compute_dtype=torch.bfloat16
-        )
-        
-        # Load base model
-        base_model = AutoModelForCausalLM.from_pretrained(
-            "Qwen/Qwen2.5-32B",
-            quantization_config=bnb_config,
-            device_map="auto",
-            trust_remote_code=True,
-            dtype=torch.bfloat16
-        )
-        
-        # Load tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            "Qwen/Qwen2.5-32B",
-            trust_remote_code=True,
-            padding_side='right'
-        )
-        
-        # Disable chat template
-        self.tokenizer.chat_template = None
-        
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
-        
+        # Load base model via CleanModelLoader
+        self.loader = CleanModelLoader("Qwen/Qwen2.5-32B", load_in_8bit=True)
+        base_model, self.tokenizer, provenance = self.loader.load()
+        logger.info(f"📋 Loader version: {provenance['loader_version'][:8]}")
+
         # Load LoRA adapters
         self.model = PeftModel.from_pretrained(base_model, self.sft_model_path)
-        
+
         logger.info("✅ SFT model loaded successfully")
     
     def generate_sft_response(self, instruction: str) -> str:
-        """Generate response using SFT model"""
+        """Generate response using SFT model via CleanModelLoader"""
         if not self.model:
             raise ValueError("SFT model not loaded")
-        
+
         # Format prompt
         prompt = f"Instruction: {instruction}\\nResponse:"
-        
-        # Tokenize
-        inputs = self.tokenizer(
+
+        response = self.loader.generate(
+            self.model,
+            self.tokenizer,
             prompt,
-            return_tensors="pt",
-            truncation=True,
-            max_length=256
-        ).to(self.model.device)
-        
-        # Generate
-        with torch.no_grad():
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=150,
-                temperature=0.7,
-                do_sample=True,
-                pad_token_id=self.tokenizer.pad_token_id,
-                eos_token_id=self.tokenizer.eos_token_id,
-                stop_strings=["END", "\\n\\n", "Instruction:"],
-                tokenizer=self.tokenizer
-            )
-        
-        # Decode response
-        response = self.tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:], skip_special_tokens=True)
+            max_new_tokens=150,
+            temperature=0.7,
+            do_sample=True,
+            stop_strings=["END", "\\n\\n", "Instruction:"]
+        )
+
         response = response.strip().split("END")[0].strip()
-        
+
         return response
     
     def load_sft_examples(self) -> List[Dict[str, Any]]:

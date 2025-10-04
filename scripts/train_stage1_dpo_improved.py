@@ -14,7 +14,7 @@ from datetime import datetime
 import sys
 import os
 from datasets import Dataset
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoTokenizer
 from trl import DPOConfig, DPOTrainer
 from peft import LoraConfig, get_peft_model, TaskType, PeftModel
 
@@ -27,6 +27,9 @@ BASE_DIR = Path(os.getenv('CAI_BASE_DIR', '/workspace/runs/stage1_20250911_13110
 ARTIFACTS_DIR = BASE_DIR / "artifacts"
 CHECKPOINTS_DIR = BASE_DIR / "checkpoints"
 sys.path.insert(0, str(BASE_DIR / 'scripts'))
+
+# Import CleanModelLoader
+from utils.clean_model_loader import CleanModelLoader
 
 # Import validation utilities
 from utils.data_validation import load_and_validate_preference_pairs
@@ -66,38 +69,11 @@ def setup_model_and_tokenizer(sft_checkpoint_path: str):
     
     logger.info(f"🔧 Loading SFT checkpoint: {sft_checkpoint_path}")
     
-    # Quantization config
-    bnb_config = BitsAndBytesConfig(
-        load_in_8bit=True,
-        bnb_8bit_use_double_quant=True,
-        bnb_8bit_quant_type="nf8",
-        bnb_8bit_compute_dtype=torch.bfloat16
-    )
-    
-    # Load tokenizer
-    logger.info("📝 Loading tokenizer...")
-    tokenizer = AutoTokenizer.from_pretrained(
-        "Qwen/Qwen2.5-32B",
-        trust_remote_code=True,
-        padding_side='right'
-    )
-    
-    # Disable chat template
-    tokenizer.chat_template = None
-    
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    
-    # Load base model
+    # Load base model via CleanModelLoader
     logger.info("🤖 Loading base model with quantization...")
-    base_model = AutoModelForCausalLM.from_pretrained(
-        "Qwen/Qwen2.5-32B",
-        quantization_config=bnb_config,
-        device_map="auto",
-        trust_remote_code=True,
-        dtype=torch.bfloat16,
-        attn_implementation="flash_attention_2"
-    )
+    loader = CleanModelLoader("Qwen/Qwen2.5-32B", load_in_8bit=True)
+    base_model, tokenizer, provenance = loader.load()
+    logger.info(f"📋 Loader version: {provenance['loader_version'][:8]}")
     
     # Load SFT LoRA adapters
     logger.info("🔌 Loading SFT LoRA adapters...")
