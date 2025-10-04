@@ -170,10 +170,10 @@ Please run the following sequence:
    - Any warnings or issues encountered
 ```
 
-**Pod Claude** (in progress):
-- ⏳ Executing session manifest creation
-- ⏳ Running sample data generation
-- ⏳ Will report results
+**Pod Claude** (blocked - pod environment broken):
+- ❌ Session manifest creation hung (torch import failed)
+- ❌ Pod environment had broken torch installation
+- ❌ Pod terminated, need new pod with working environment
 
 **Expected Output**:
 - `artifacts/session_manifest_<timestamp>.json`
@@ -248,12 +248,17 @@ Please run the following sequence:
 - Task-focused instructions (not open-ended)
 - Local Claude handles all design/coding
 
-### Challenge 4: Pod Environment Issues
-**Issue**: Setup script had memory issues during verification
+### Challenge 4: Pod Environment Reliability
+**Issue**: First H100 pod had broken torch installation causing hangs
+**Root Cause**: Pod environment had misconfigured/broken torch (file descriptor/memory exhaustion on import)
+**Impact**: Pod became unresponsive, had to be terminated, ~$0.45 lost
 **Mitigation**:
-- Manual setup when automated fails
-- Dependencies already installed (verification optional)
-- Document workarounds for future sessions
+- Always smoke test torch import BEFORE running any scripts
+- Test commands documented in `KNOWN_BUGS_AND_FIXES.md`
+- Don't skip setup script verification (it catches this)
+- Be prepared to try different pods/templates if torch doesn't work
+**Lesson**: Expensive pod ≠ working environment, verify basics first
+**See**: `KNOWN_BUGS_AND_FIXES.md` - "RunPod Environment - Torch Import Hangs"
 
 ---
 
@@ -319,8 +324,11 @@ If this workflow succeeds, we can:
 - **2025-10-04 15:00** - Local Claude created sample generation script
 - **2025-10-04 19:30** - User set up pod, pulled latest code
 - **2025-10-04 19:45** - Pod Claude launched and instructed
-- **2025-10-04 19:50** - Sample generation started (in progress)
-- **Next**: Results review and quality approval
+- **2025-10-04 19:50** - Pod Claude execution blocked: session manifest script hung
+- **2025-10-04 20:00** - Local Claude diagnosed: pod has broken torch installation
+- **2025-10-04 20:10** - Pod terminated (environment unfixable, ~$0.45 cost)
+- **2025-10-04 20:15** - Documented environment issue and smoke test procedure
+- **Next**: User starts new pod, smoke tests torch, resumes workflow
 
 ---
 

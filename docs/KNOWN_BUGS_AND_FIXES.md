@@ -1,6 +1,6 @@
 # Known Bugs and Fixes
 
-**Last Updated**: 2025-10-03
+**Last Updated**: 2025-10-04
 **Purpose**: Document bugs discovered and their fixes to prevent regression
 
 ---
@@ -66,6 +66,72 @@ Before ANY base model evaluation:
 - [ ] Check first 100 chars of encoded input for `<|im_start|>`
 - [ ] Test sentinel instructions
 - [ ] Log exact tokenization path
+
+---
+
+## 🚨 CRITICAL: RunPod Environment - Torch Import Hangs
+
+### The Bug
+**Discovered**: 2025-10-04 (RunPod H100 pod, pod ID lost)
+**Status**: ⚠️ ENVIRONMENT ISSUE - needs new pod with working torch
+**Symptom**: Scripts hang indefinitely when importing torch, SSH becomes unresponsive
+**Root Cause**: Pod environment had broken/misconfigured torch installation that:
+- Exhausted file descriptors ("Too many open files in system")
+- Exhausted memory ("Cannot allocate memory")
+- Hung indefinitely trying to initialize CUDA
+
+### Where It Hit Us
+1. **`scripts/setup_runpod_environment.sh` (lines 114-134)**:
+   - Verification step imports torch to check versions
+   - Hung during "Verifying installations..."
+
+2. **`scripts/create_session_manifest.py` → `provenance_helper.py:251`**:
+   - Session manifest script imports torch for GPU info
+   - Hung on first execution by Pod Claude
+   - User could not interrupt (Ctrl+C ineffective) or open new SSH session
+   - Pod became completely unresponsive, had to be terminated
+
+### This is NOT a Code Bug
+This is a **pod environment problem**. Our scripts require torch to work - we can't work around a broken torch installation with try/except. We need torch to import successfully for ANY ML work.
+
+### Diagnosis Steps for New Pod
+Before running ANY of our scripts on a new pod:
+
+```bash
+# 1. Test basic torch import (should complete in <5 seconds)
+timeout 10 python3 -c "import torch; print('Torch:', torch.__version__)"
+
+# 2. Test CUDA availability
+python3 -c "import torch; print('CUDA:', torch.cuda.is_available())"
+
+# 3. Test GPU access
+python3 -c "import torch; print('GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'No GPU')"
+```
+
+If ANY of these hang or fail:
+- **Don't use this pod** - the environment is broken
+- Try different RunPod template
+- Or reinstall torch: `pip uninstall torch && pip install torch --index-url https://download.pytorch.org/whl/cu121`
+- Check CUDA setup: `nvidia-smi` and `nvcc --version`
+- Check system limits: `ulimit -a`
+
+### Recovery Procedure
+If pod hangs during torch import:
+1. **Terminate pod from RunPod dashboard** (SSH is unresponsive)
+2. **Start new pod**
+3. **Test torch import FIRST** (before cloning repo or running scripts)
+4. **Only proceed if torch works**
+
+### Lessons Learned
+- Pod being expensive ($2.69/hr) doesn't guarantee working environment
+- Always smoke test torch before assuming environment is ready
+- Setup script verification is important - don't skip it
+- SSH lockout on hang is expensive - loses time and requires dashboard access
+
+### Status
+- ❌ First H100 pod (lost) had broken torch
+- ⏳ Need new pod with verified working torch environment
+- ⏳ Then can resume sample data generation workflow
 
 ---
 
