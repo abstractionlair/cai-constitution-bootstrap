@@ -32,7 +32,7 @@ class TestMcNemarTest(unittest.TestCase):
         # Example from McNemar (1947)
         # Discordant pairs: n01=10, n10=2
         # χ² = (|10 - 2| - 1)² / (10 + 2) = 49 / 12 = 4.083
-        chi2, p = mcnemar_test(n01=10, n10=2, continuity=True)
+        chi2, p = mcnemar_test(n01=10, n10=2, method="chi2")
         self.assertAlmostEqual(chi2, 4.083, places=3)
         self.assertLess(p, 0.05)  # Significant at α=0.05
 
@@ -45,24 +45,48 @@ class TestMcNemarTest(unittest.TestCase):
     def test_one_sided_discordance(self):
         """Test when only one model ever wins."""
         # Model 2 always wins disagreements
-        chi2, p = mcnemar_test(n01=100, n10=0, continuity=True)
+        chi2, p = mcnemar_test(n01=100, n10=0, method="chi2")
         self.assertGreater(chi2, 90)  # Very large chi2
         self.assertLess(p, 1e-20)  # Extremely significant
 
     def test_symmetric(self):
         """Test equal discordant pairs (no difference)."""
         # Equal wins each way = no significant difference
-        chi2, p = mcnemar_test(n01=50, n10=50, continuity=True)
+        chi2, p = mcnemar_test(n01=50, n10=50, method="chi2")
         self.assertLess(chi2, 0.1)  # Near zero
         self.assertGreater(p, 0.5)  # Not significant
 
     def test_continuity_correction(self):
         """Test with and without continuity correction."""
         n01, n10 = 15, 5
-        chi2_with, _ = mcnemar_test(n01, n10, continuity=True)
-        chi2_without, _ = mcnemar_test(n01, n10, continuity=False)
+        chi2_with, _ = mcnemar_test(n01, n10, method="chi2")
+        chi2_without, _ = mcnemar_test(n01, n10, method="chi2_no_continuity")
         # With correction should be smaller (more conservative)
         self.assertLess(chi2_with, chi2_without)
+
+    def test_exact_method(self):
+        """Test exact binomial method for small n."""
+        # Small discordant count - exact test recommended
+        n01, n10 = 8, 2
+        stat, p_exact = mcnemar_test(n01, n10, method="exact")
+
+        # Exact should give statistic = min(n01, n10) = 2
+        self.assertEqual(stat, 2)
+
+        # Should be marginally significant (8 vs 2)
+        self.assertLess(p_exact, 0.15)  # p ≈ 0.109
+
+    def test_auto_method_selection(self):
+        """Test that auto method selects appropriately."""
+        # Small n -> should use exact
+        stat_small, p_small = mcnemar_test(n01=10, n10=2, method="auto")
+        # For small n (< 25), statistic should be integer (exact method)
+        self.assertEqual(stat_small, min(10, 2))
+
+        # Large n -> should use chi2
+        stat_large, p_large = mcnemar_test(n01=100, n10=50, method="auto")
+        # For large n, statistic should be float (chi2 method)
+        self.assertGreater(stat_large, 10)  # Chi2 value, not count
 
 
 class TestBenjaminiHochberg(unittest.TestCase):

@@ -43,10 +43,11 @@ def get_git_sha(short: bool = False) -> str:
         short: If True, return short SHA (7 chars). Default False (full 40 chars).
 
     Returns:
-        Git commit SHA string
+        Git commit SHA string, or "git_not_available" if git not found
 
-    Raises:
-        RuntimeError: If not in a git repository or git command fails
+    Note:
+        Returns "git_not_available" if git command not found or not in a git repository.
+        This allows scripts to run in environments without git installed.
     """
     try:
         cmd = ['git', 'rev-parse', '--short' if short else 'HEAD']
@@ -56,8 +57,14 @@ def get_git_sha(short: bool = False) -> str:
             text=True
         )
         return result.strip()
+    except FileNotFoundError:
+        # git command not found
+        warnings.warn("git command not found. Unable to capture git provenance.")
+        return "git_not_available"
     except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"Failed to get git SHA: {e.stderr}") from e
+        # Not in a git repository or other git error
+        warnings.warn(f"Failed to get git SHA: {e.stderr}")
+        return "git_not_available"
 
 
 def get_git_branch() -> str:
@@ -65,10 +72,10 @@ def get_git_branch() -> str:
     Get current git branch name.
 
     Returns:
-        Branch name (e.g., 'main', 'feature/foo')
+        Branch name (e.g., 'main', 'feature/foo'), or "git_not_available" if git not found
 
-    Raises:
-        RuntimeError: If not in a git repository or git command fails
+    Note:
+        Returns "git_not_available" if git command not found or not in a git repository.
     """
     try:
         result = subprocess.check_output(
@@ -77,8 +84,12 @@ def get_git_branch() -> str:
             text=True
         )
         return result.strip()
+    except FileNotFoundError:
+        warnings.warn("git command not found. Unable to capture git branch.")
+        return "git_not_available"
     except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"Failed to get git branch: {e.stderr}") from e
+        warnings.warn(f"Failed to get git branch: {e.stderr}")
+        return "git_not_available"
 
 
 def check_git_dirty() -> bool:
@@ -87,10 +98,10 @@ def check_git_dirty() -> bool:
 
     Returns:
         True if there are uncommitted changes (working tree is dirty)
-        False if working tree is clean
+        False if working tree is clean or git not available
 
-    Raises:
-        RuntimeError: If not in a git repository or git command fails
+    Note:
+        Returns False if git command not found (assumes clean state as safe default).
     """
     try:
         result = subprocess.run(
@@ -101,8 +112,12 @@ def check_git_dirty() -> bool:
         )
         # If output is non-empty, there are uncommitted changes
         return len(result.stdout.strip()) > 0
+    except FileNotFoundError:
+        warnings.warn("git command not found. Cannot check for uncommitted changes.")
+        return False  # Assume clean if git not available
     except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"Failed to check git status: {e.stderr}") from e
+        warnings.warn(f"Failed to check git status: {e.stderr}")
+        return False  # Assume clean if error
 
 
 def create_artifact_metadata(

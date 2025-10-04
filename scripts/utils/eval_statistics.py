@@ -32,7 +32,11 @@ from typing import Dict, List, Tuple, Optional, Callable, Any
 import warnings
 
 
-def mcnemar_test(n01: int, n10: int, continuity: bool = True) -> Tuple[float, float]:
+def mcnemar_test(
+    n01: int,
+    n10: int,
+    method: str = "auto"
+) -> Tuple[float, float]:
     """
     McNemar test for paired binary outcomes.
 
@@ -46,24 +50,33 @@ def mcnemar_test(n01: int, n10: int, continuity: bool = True) -> Tuple[float, fl
 
     Concordant pairs (both succeed or both fail) provide no information.
 
-    Formula (with continuity correction):
+    Formula (chi-squared with continuity correction):
         χ² = (|n01 - n10| - 1)² / (n01 + n10)
         df = 1
+
+    Exact method (binomial):
+        p = 2 * P(X ≤ min(n01, n10)) where X ~ Binomial(n01+n10, 0.5)
 
     Args:
         n01: Count of (model1=0, model2=1) - model2 wins
         n10: Count of (model1=1, model2=0) - model1 wins
-        continuity: Apply continuity correction (default True)
+        method: Test method (default "auto"):
+                - "auto": Use exact if n01+n10 < 25, else chi-squared with continuity
+                - "exact": Exact binomial test (recommended for small n)
+                - "chi2": Chi-squared with continuity correction
+                - "chi2_no_continuity": Chi-squared without continuity
 
     Returns:
-        (chi2, p_value)
+        (statistic, p_value)
+        - If exact: statistic is min(n01, n10), p_value from binomial
+        - If chi2: statistic is χ², p_value from chi-squared distribution
 
     Example:
         >>> # Base model: 15% success, SFT: 78% success, N=1000
         >>> # Discordant: 630 where SFT succeeds but base fails
         >>> #             0 where base succeeds but SFT fails
-        >>> chi2, p = mcnemar_test(n01=630, n10=0)
-        >>> print(f"χ²={chi2:.2f}, p={p:.2e}")  # Highly significant
+        >>> stat, p = mcnemar_test(n01=630, n10=0, method="auto")
+        >>> print(f"stat={stat:.2f}, p={p:.2e}")  # Highly significant
     """
     n_discordant = n01 + n10
 
@@ -72,17 +85,41 @@ def mcnemar_test(n01: int, n10: int, continuity: bool = True) -> Tuple[float, fl
         warnings.warn("No discordant pairs found. Models have identical predictions.")
         return 0.0, 1.0
 
-    if continuity:
-        # Continuity correction for better approximation to chi-squared distribution
-        # Recommended for small counts (n01 + n10 < 25)
-        chi2 = (abs(n01 - n10) - 1) ** 2 / n_discordant
+    # Auto-select method based on sample size
+    if method == "auto":
+        method = "exact" if n_discordant < 25 else "chi2"
+
+    if method == "exact":
+        # Exact binomial test
+        # Under H0, each discordant pair has p=0.5 of being (0,1) vs (1,0)
+        # Test statistic: min(n01, n10)
+        # Two-sided p-value: 2 * P(X ≤ min(n01, n10))
+        k = min(n01, n10)
+        p_value = 2 * stats.binom.cdf(k, n_discordant, 0.5)
+        # Clip to [0, 1] (can exceed 1 for k near n/2)
+        p_value = min(p_value, 1.0)
+        return float(k), p_value
+
+    elif method in ["chi2", "chi2_no_continuity"]:
+        # Chi-squared test (asymptotic)
+        continuity = (method == "chi2")
+
+        if continuity:
+            # Continuity correction for better approximation
+            chi2 = (abs(n01 - n10) - 1) ** 2 / n_discordant
+        else:
+            chi2 = (n01 - n10) ** 2 / n_discordant
+
+        # Chi-squared distribution with df=1
+        p_value = 1 - stats.chi2.cdf(chi2, df=1)
+
+        return chi2, p_value
+
     else:
-        chi2 = (n01 - n10) ** 2 / n_discordant
-
-    # Chi-squared distribution with df=1
-    p_value = 1 - stats.chi2.cdf(chi2, df=1)
-
-    return chi2, p_value
+        raise ValueError(
+            f"Invalid method '{method}'. "
+            f"Choose from: 'auto', 'exact', 'chi2', 'chi2_no_continuity'"
+        )
 
 
 def benjamini_hochberg(
@@ -444,9 +481,9 @@ def paired_comparison_analysis(
         n01 = int(((m1_res == 0) & (m2_res == 1)).sum())  # Model2 wins
         n10 = int(((m1_res == 1) & (m2_res == 0)).sum())  # Model1 wins
 
-        # McNemar test
+        # McNemar test (auto-selects exact for small n, chi2 for large n)
         if n > 0:
-            chi2, p_val = mcnemar_test(n01, n10, continuity=True)
+            chi2, p_val = mcnemar_test(n01, n10, method="auto")
         else:
             chi2, p_val = 0.0, 1.0
 
@@ -500,15 +537,17 @@ def paired_comparison_analysis(
     bh_correction_info = {
         'fdr': fdr,
         'n_tests': len(p_values_by_type),
-        'n_significant_raw': 0,
-        'n_significant_adjusted': 0
+        'n_raw_p_lt_0_05': 0,  # How many raw p < 0.05 (standard threshold)
+        'n_significant_adjusted': 0  # How many rejected after BH correction
     }
 
     if p_values_by_type:
         adjusted_p, rejections = benjamini_hochberg(p_values_by_type, fdr)
 
-        bh_correction_info['n_significant_raw'] = int(
-            (np.array(p_values_by_type) < fdr).sum()
+        # Count raw p-values < 0.05 (standard significance level)
+        # Note: This is NOT the same as BH rejection - just a descriptive stat
+        bh_correction_info['n_raw_p_lt_0_05'] = int(
+            (np.array(p_values_by_type) < 0.05).sum()
         )
         bh_correction_info['n_significant_adjusted'] = int(rejections.sum())
 
