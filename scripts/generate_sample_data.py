@@ -194,9 +194,17 @@ def generate_sample_dataset(count: int = 50, seed: int = 42):
         logger.info(f"  {itype}: {icount}")
     logger.info("")
 
-    # Generate examples
+    # Generate examples with QC tracking (Codex review: automated metrics)
     examples = []
     example_idx = 0
+    qc_metrics = {
+        'delimiter_found': 0,
+        'delimiter_missing': 0,
+        'heuristic_cutoff': 0,
+        'hit_token_limit': 0,
+        'token_counts': [],
+        'forbidden_markers_found': 0,
+    }
 
     for instruction_type, type_count in type_counts.items():
         logger.info(f"Generating {type_count} '{instruction_type}' examples...")
@@ -211,23 +219,64 @@ def generate_sample_dataset(count: int = 50, seed: int = 42):
                 inst_data['instruction']
             )
 
-            # Generate response
+            # Generate response with conservative parameters to reduce runaway risk
             # Note: Reproducibility via inst_seed handled by setting torch/numpy random state,
             # not per-generation seed parameter (CleanModelLoader.generate doesn't accept seed)
             response = loader.generate(
                 model, tokenizer, prompt,
-                max_new_tokens=150,
-                temperature=0.7,
+                max_new_tokens=80,  # Reduced from 150 (Codex: most responses <50 tokens)
+                temperature=0.4,    # Reduced from 0.7 (Codex: 0.3-0.5 for focused generation)
+                top_p=0.9,
+                repetition_penalty=1.1,
                 do_sample=True
             )
 
-            # Clean up response
-            # 1. Stop at ###END### delimiter (prevents multi-QA generation)
-            if '###END###' in response:
-                response = response.split('###END###')[0]
+            # Track raw response stats for QC
+            raw_response = response
+            raw_token_count = len(tokenizer.encode(response))
 
-            # 2. Remove trailing whitespace, extra newlines
+            # Clean up response with layered guards (Codex review: multi-guard approach)
+            # 1. Stop at ###END### delimiter (primary guard)
+            delimiter_found = '###END###' in response
+            if delimiter_found:
+                response = response.split('###END###')[0]
+                qc_metrics['delimiter_found'] += 1
+            else:
+                qc_metrics['delimiter_missing'] += 1
+
+            # 2. Heuristic cutoff at common continuation markers (backup guard)
+            #    Stop at first occurrence of patterns that indicate multi-QA chaining
+            import re
+            heuristic_cutoff_applied = False
+            continuation_patterns = [
+                r'\n\n(?:Instruction|Q:|A:|Response:)',  # New Q&A block
+                r'\n(?:What |How |Why |When |Where |Who |Can |Should )',  # New question
+            ]
+            for pattern in continuation_patterns:
+                match = re.search(pattern, response)
+                if match:
+                    response = response[:match.start()]
+                    heuristic_cutoff_applied = True
+                    break
+
+            if heuristic_cutoff_applied:
+                qc_metrics['heuristic_cutoff'] += 1
+
+            # 3. Remove trailing whitespace, extra newlines
             response = response.strip()
+
+            # Track cleaned response stats
+            clean_token_count = len(tokenizer.encode(response))
+            qc_metrics['token_counts'].append(clean_token_count)
+
+            # Check if hit token limit (approximately - within 5 tokens of max)
+            if raw_token_count >= 75:  # 80 - 5 token buffer
+                qc_metrics['hit_token_limit'] += 1
+
+            # Check for forbidden markers in final cleaned response
+            forbidden_markers = ['###END###', 'Instruction:', 'Q:', 'Response:']
+            if any(marker in response for marker in forbidden_markers):
+                qc_metrics['forbidden_markers_found'] += 1
 
             # Create training format
             formatted_text = f"Instruction: {inst_data['instruction']}\nResponse: {response}"
@@ -273,24 +322,74 @@ def generate_sample_dataset(count: int = 50, seed: int = 42):
     logger.info(f"✅ Saved to: {output_path}")
     logger.info("")
 
-    # Print summary
+    # Compute and display QC metrics (Codex review: automated validation)
+    import statistics
+    token_counts = qc_metrics['token_counts']
+    median_tokens = statistics.median(token_counts) if token_counts else 0
+    mean_tokens = statistics.mean(token_counts) if token_counts else 0
+
+    pct_delimiter_found = (qc_metrics['delimiter_found'] / count * 100) if count > 0 else 0
+    pct_delimiter_missing = (qc_metrics['delimiter_missing'] / count * 100) if count > 0 else 0
+    pct_heuristic_cutoff = (qc_metrics['heuristic_cutoff'] / count * 100) if count > 0 else 0
+    pct_hit_limit = (qc_metrics['hit_token_limit'] / count * 100) if count > 0 else 0
+    pct_forbidden = (qc_metrics['forbidden_markers_found'] / count * 100) if count > 0 else 0
+
     logger.info("=" * 70)
-    logger.info("Generation Complete")
+    logger.info("Quality Control Metrics (Codex Review Criteria)")
     logger.info("=" * 70)
     logger.info(f"Total examples: {len(examples)}")
-    logger.info(f"Output file: {output_path}")
     logger.info("")
-    logger.info("Next steps:")
+    logger.info("Delimiter Performance:")
+    logger.info(f"  Delimiter found: {qc_metrics['delimiter_found']} ({pct_delimiter_found:.1f}%) [Target: >80%]")
+    logger.info(f"  Delimiter missing: {qc_metrics['delimiter_missing']} ({pct_delimiter_missing:.1f}%)")
+    logger.info(f"  Heuristic cutoff applied: {qc_metrics['heuristic_cutoff']} ({pct_heuristic_cutoff:.1f}%)")
+    logger.info("")
+    logger.info("Token Usage:")
+    logger.info(f"  Median tokens: {median_tokens:.0f} [Target: <40]")
+    logger.info(f"  Mean tokens: {mean_tokens:.1f}")
+    logger.info(f"  Hit token limit: {qc_metrics['hit_token_limit']} ({pct_hit_limit:.1f}%) [Target: <10%]")
+    logger.info("")
+    logger.info("Contamination:")
+    logger.info(f"  Forbidden markers in responses: {qc_metrics['forbidden_markers_found']} ({pct_forbidden:.1f}%) [Target: 0%]")
+    logger.info("")
+
+    # Pass/fail assessment
+    passed = (
+        pct_delimiter_found >= 80 and
+        pct_hit_limit < 10 and
+        median_tokens < 40 and
+        qc_metrics['forbidden_markers_found'] == 0
+    )
+
+    if passed:
+        logger.info("✅ QC PASSED - All thresholds met, safe to proceed to full generation")
+    else:
+        logger.info("❌ QC FAILED - Thresholds not met:")
+        if pct_delimiter_found < 80:
+            logger.info(f"   - Delimiter found rate too low: {pct_delimiter_found:.1f}% < 80%")
+        if pct_hit_limit >= 10:
+            logger.info(f"   - Too many responses hit token limit: {pct_hit_limit:.1f}% >= 10%")
+        if median_tokens >= 40:
+            logger.info(f"   - Median tokens too high: {median_tokens:.0f} >= 40")
+        if qc_metrics['forbidden_markers_found'] > 0:
+            logger.info(f"   - Forbidden markers found in {qc_metrics['forbidden_markers_found']} responses")
+        logger.info("")
+        logger.info("⚠️  DO NOT proceed to 15k generation until issues resolved")
+
+    logger.info("")
+    logger.info("=" * 70)
+    logger.info("Manual Inspection Commands")
+    logger.info("=" * 70)
     logger.info("  1. Inspect sample data:")
     logger.info(f"     jq '.' {output_path} | head -50")
     logger.info("  2. Check metadata:")
     logger.info(f"     jq '.metadata' {output_path} | head -1")
     logger.info("  3. Review responses:")
     logger.info(f"     jq '.response' {output_path} | head -20")
-    logger.info("  4. Check for contamination (should be completions, not instruction-following):")
-    logger.info(f"     jq '.response' {output_path} | grep -i 'here is\\|here are\\|step 1' | head")
+    logger.info("  4. Check for runaway generation:")
+    logger.info(f"     jq '.response' {output_path} | grep -E '(What|How|Why|Instruction)' | head -10")
     logger.info("")
-    logger.info("If quality looks good, proceed with full generation (15-20k examples)")
+    logger.info("Output file: {output_path}")
     logger.info("")
 
 
