@@ -195,8 +195,9 @@ class InstructionFollowingEvaluator:
             load_in_4bit=False
         )
 
-        self.model, self.tokenizer = self.loader.load()
+        self.model, self.tokenizer, self.provenance = self.loader.load()
         logger.info("✅ Model loaded with CleanModelLoader (contamination-free)")
+        logger.info(f"📋 Loader version: {self.provenance['loader_version'][:8]}")
 
     def generate_response(self, instruction: str, max_tokens: int = 100) -> Tuple[str, int]:
         """Generate response to instruction (using CleanModelLoader)"""

@@ -12,12 +12,28 @@ See: /docs/BASE_MODEL_TRUTH.md for why this matters.
 
 import torch
 import logging
-from typing import Tuple, Optional, Dict, Any
+import subprocess
+from typing import Tuple, Optional, Dict, Any, List
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from pathlib import Path
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Qwen chat template special token IDs
+# These are the actual token IDs used by Qwen chat templates
+QWEN_CHAT_TOKEN_IDS = {
+    151644,  # <|im_start|>
+    151645,  # <|im_end|>
+    # Add more if discovered
+}
+
+# Sentinel prompts for testing contamination
+SENTINEL_PROMPTS = [
+    "Translate to French: hello",
+    "Answer this: What is 2+2?",
+    "List three colors",
+]
 
 
 class CleanModelLoader:
@@ -66,12 +82,69 @@ class CleanModelLoader:
             logger.warning(f"⚠️ Model name contains 'instruct' or 'chat': {model_name}")
             logger.warning("⚠️ This may be an instruction-tuned model, not a base model!")
 
-    def load(self) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
+    def _get_git_sha(self) -> str:
+        """Get current git SHA for provenance tracking"""
+        try:
+            sha = subprocess.check_output(
+                ['git', 'rev-parse', 'HEAD'],
+                cwd=Path(__file__).parent,
+                stderr=subprocess.DEVNULL
+            ).decode('ascii').strip()
+            return sha
+        except:
+            return "unknown"
+
+    def _verify_no_template_injection(self, tokenizer: AutoTokenizer, prompt: str) -> None:
+        """
+        Verify that add_special_tokens makes no difference.
+        If it does, template is being applied.
+        """
+        with_special = tokenizer(prompt, add_special_tokens=True, return_tensors="pt")['input_ids'][0]
+        without_special = tokenizer(prompt, add_special_tokens=False, return_tensors="pt")['input_ids'][0]
+
+        if len(with_special) != len(without_special):
+            raise RuntimeError(
+                f"❌ Template injection detected!\n"
+                f"   add_special_tokens=True adds {len(with_special) - len(without_special)} tokens\n"
+                f"   Prompt: {prompt[:50]}..."
+            )
+
+        # Also check for chat template token IDs
+        all_tokens = set(without_special.tolist())
+        contaminated_tokens = all_tokens & QWEN_CHAT_TOKEN_IDS
+
+        if contaminated_tokens:
+            raise RuntimeError(
+                f"❌ Chat template token IDs detected: {contaminated_tokens}\n"
+                f"   Prompt: {prompt[:50]}..."
+            )
+
+    def _run_sentinel_tests(self, tokenizer: AutoTokenizer) -> None:
+        """Run sentinel prompts to detect contamination"""
+        logger.info("🧪 Running sentinel contamination tests...")
+
+        for prompt in SENTINEL_PROMPTS:
+            try:
+                self._verify_no_template_injection(tokenizer, prompt)
+            except RuntimeError as e:
+                logger.error(f"❌ Sentinel test failed: {prompt}")
+                raise
+
+        logger.info("✅ All sentinel tests passed (no contamination)")
+
+    def load(self) -> Tuple[AutoModelForCausalLM, AutoTokenizer, Dict[str, Any]]:
         """
         Load model and tokenizer with contamination prevention.
 
         Returns:
-            Tuple of (model, tokenizer) - GUARANTEED clean
+            Tuple of (model, tokenizer, provenance) - GUARANTEED clean
+
+        Provenance dict contains:
+            - loader_version: Git SHA of loader code
+            - template_disabled: Always True
+            - model_name: Model identifier
+            - quantization: "4bit", "8bit", or "16bit"
+            - sentinel_tests_passed: Always True (or exception raised)
         """
         logger.info("=" * 60)
         logger.info("🧪 Loading CLEAN base model (contamination-free)")
@@ -120,7 +193,7 @@ class CleanModelLoader:
             quantization_config = BitsAndBytesConfig(
                 load_in_8bit=True,
                 bnb_8bit_use_double_quant=True,
-                bnb_8bit_quant_type="nf8",
+                bnb_8bit_quant_type="nf4",  # nf4 is more expressive than nf8
                 bnb_8bit_compute_dtype=torch.bfloat16
             )
 
@@ -137,7 +210,21 @@ class CleanModelLoader:
 
         model.eval()
 
-        # Step 6: Log success and memory
+        # Step 6: Run sentinel contamination tests
+        self._run_sentinel_tests(tokenizer)
+
+        # Step 7: Create provenance metadata
+        quantization_type = "4bit" if self.load_in_4bit else ("8bit" if self.load_in_8bit else "16bit")
+        provenance = {
+            'loader_version': self._get_git_sha(),
+            'template_disabled': True,
+            'model_name': self.model_name,
+            'quantization': quantization_type,
+            'sentinel_tests_passed': True,
+            'add_special_tokens': False,  # We always use False
+        }
+
+        # Step 8: Log success and memory
         logger.info("✅ Model loaded successfully")
 
         if torch.cuda.is_available():
@@ -146,11 +233,12 @@ class CleanModelLoader:
             logger.info(f"🎮 GPU: {torch.cuda.get_device_name(0)}")
             logger.info(f"💾 Memory: {allocated:.1f}GB / {gpu_mem:.1f}GB")
 
+        logger.info(f"📋 Provenance: loader_version={provenance['loader_version'][:8]}, quantization={quantization_type}")
         logger.info("=" * 60)
         logger.info("✅ CLEAN MODEL READY (no contamination)")
         logger.info("=" * 60)
 
-        return model, tokenizer
+        return model, tokenizer, provenance
 
     def tokenize_clean(
         self,
@@ -158,7 +246,8 @@ class CleanModelLoader:
         text: str,
         max_length: int = 512,
         truncation: bool = True,
-        return_tensors: str = "pt"
+        return_tensors: str = "pt",
+        verify_contamination: bool = True
     ) -> Dict[str, torch.Tensor]:
         """
         Tokenize text WITHOUT applying chat templates.
@@ -169,6 +258,7 @@ class CleanModelLoader:
             max_length: Maximum length
             truncation: Whether to truncate
             return_tensors: Format ("pt" for PyTorch)
+            verify_contamination: Whether to check for contamination tokens
 
         Returns:
             Tokenized inputs dictionary
@@ -186,6 +276,20 @@ class CleanModelLoader:
             truncation=truncation,
             padding=False
         )
+
+        # Verify no contamination token IDs in ALL tokens (not just first 10)
+        if verify_contamination:
+            all_token_ids = set(inputs['input_ids'][0].tolist())
+            contaminated_tokens = all_token_ids & QWEN_CHAT_TOKEN_IDS
+
+            if contaminated_tokens:
+                token_preview = tokenizer.decode(inputs['input_ids'][0], skip_special_tokens=False)
+                raise RuntimeError(
+                    f"❌ Chat template token IDs detected in tokenized input!\n"
+                    f"   Contaminated IDs: {contaminated_tokens}\n"
+                    f"   Text preview: {text[:50]}...\n"
+                    f"   Token preview: {token_preview[:100]}..."
+                )
 
         return inputs
 
@@ -218,19 +322,9 @@ class CleanModelLoader:
         Returns:
             Generated text (excluding prompt unless return_full_text=True)
         """
-        # Tokenize cleanly
-        inputs = self.tokenize_clean(tokenizer, prompt)
+        # Tokenize cleanly (with contamination verification)
+        inputs = self.tokenize_clean(tokenizer, prompt, verify_contamination=True)
         inputs = {k: v.to(model.device) for k, v in inputs.items()}
-
-        # Log first few tokens for verification
-        first_tokens = inputs['input_ids'][0][:10].tolist()
-        token_preview = tokenizer.decode(first_tokens, skip_special_tokens=True)
-
-        # Check for contamination markers
-        contamination_markers = ['<|im_start|>', '<|im_end|>', 'system', 'user', 'assistant']
-        if any(marker in token_preview for marker in contamination_markers):
-            logger.error(f"❌ CONTAMINATION DETECTED in tokens: {token_preview}")
-            raise RuntimeError("Chat template contamination detected!")
 
         # Generate
         with torch.no_grad():
@@ -260,7 +354,7 @@ class CleanModelLoader:
 def load_clean_base_model(
     model_name: str = "Qwen/Qwen2.5-32B",
     quantization: str = "4bit"
-) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
+) -> Tuple[AutoModelForCausalLM, AutoTokenizer, Dict[str, Any]]:
     """
     Convenience function for loading clean base model.
 
@@ -269,10 +363,10 @@ def load_clean_base_model(
         quantization: "4bit", "8bit", or "none"
 
     Returns:
-        Tuple of (model, tokenizer) with guaranteed no contamination
+        Tuple of (model, tokenizer, provenance) with guaranteed no contamination
 
     Example:
-        model, tokenizer = load_clean_base_model()
+        model, tokenizer, prov = load_clean_base_model()
         loader = CleanModelLoader(model_name)
         response = loader.generate(model, tokenizer, "Complete: Water freezes at")
     """
@@ -296,7 +390,9 @@ if __name__ == "__main__":
     try:
         # Load model
         loader = CleanModelLoader("Qwen/Qwen2.5-32B")
-        model, tokenizer = loader.load()
+        model, tokenizer, provenance = loader.load()
+
+        print(f"\n📋 Provenance: {provenance}")
 
         # Test generation
         print("\n📝 Testing generation (should NOT follow instruction cleanly):")
@@ -312,6 +408,8 @@ if __name__ == "__main__":
             print(f"Response: {response[:100]}...")
 
         print("\n✅ Clean model loading test passed!")
+        print(f"✅ Loader version: {provenance['loader_version']}")
+        print(f"✅ Sentinel tests: passed")
 
         # Cleanup
         del model, tokenizer

@@ -120,8 +120,9 @@ class SFTDataGenerator:
             load_in_4bit=False
         )
 
-        self.model, self.tokenizer = self.loader.load()
+        self.model, self.tokenizer, self.provenance = self.loader.load()
         logger.info("✅ Base model loaded with CleanModelLoader (contamination-free)")
+        logger.info(f"📋 Loader version: {self.provenance['loader_version'][:8]}")
     
     def generate_instruction(self, inst_type: str, inst_id: str) -> Dict[str, Any]:
         """Generate a single instruction of given type"""

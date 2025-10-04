@@ -12,7 +12,6 @@ from typing import Dict, List, Any
 from datetime import datetime
 import sys
 import os
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -23,6 +22,9 @@ BASE_DIR = Path(os.getenv('CAI_BASE_DIR', '/workspace/runs/stage1_20250911_13110
 ARTIFACTS_DIR = BASE_DIR / "artifacts"
 sys.path.insert(0, str(BASE_DIR / 'scripts'))
 
+# Import clean model loader
+from utils.clean_model_loader import CleanModelLoader
+
 # Create directories
 ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -31,49 +33,16 @@ class UltraCleanBaseTest:
     
     def __init__(self):
         """Initialize with strict contamination prevention"""
-        
+
         logger.info("🧪 Initializing ultra-clean base model test")
-        
-        # Load model and tokenizer with strict settings
-        model_name = "Qwen/Qwen2.5-32B"
-        
-        # Load tokenizer first
-        logger.info("📝 Loading tokenizer with chat template disabled...")
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            model_name,
-            trust_remote_code=True,
-            use_fast=True
-        )
-        
-        # CRITICAL: Completely disable chat template
-        self.tokenizer.chat_template = None
-        if hasattr(self.tokenizer, 'default_chat_template'):
-            self.tokenizer.default_chat_template = None
-        
-        # Set pad token
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
-        
-        # Load model with quantization for memory efficiency
-        logger.info("🤖 Loading base model with quantization...")
-        quantization_config = BitsAndBytesConfig(
-            load_in_8bit=True,
-            bnb_8bit_use_double_quant=True,
-            bnb_8bit_quant_type="nf8",
-            bnb_8bit_compute_dtype=torch.bfloat16
-        )
-        
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            quantization_config=quantization_config,
-            device_map="auto",
-            trust_remote_code=True,
-            dtype=torch.bfloat16,
-            attn_implementation="flash_attention_2" if torch.cuda.is_available() else "eager"
-        )
-        
-        self.model.eval()
+
+        # Load model via CleanModelLoader (guaranteed contamination-free)
+        logger.info("📝 Loading model via CleanModelLoader...")
+        self.loader = CleanModelLoader("Qwen/Qwen2.5-32B", load_in_8bit=True)
+        self.model, self.tokenizer, self.provenance = self.loader.load()
+
         logger.info("✅ Model loaded in ultra-clean mode")
+        logger.info(f"📋 Loader version: {self.provenance['loader_version'][:8]}")
         
         # Define test cases (sentinel tests from BASE_MODEL_TRUTH.md)
         self.test_cases = {
@@ -121,40 +90,23 @@ class UltraCleanBaseTest:
     
     def _generate_ultra_clean(self, prompt: str, temperature: float = 0.7) -> Dict[str, Any]:
         """Generate with absolute zero template contamination"""
-        
-        # Tokenize with add_special_tokens=False - CRITICAL!
-        inputs = self.tokenizer(
+
+        # Use CleanModelLoader's generate method (guaranteed safe)
+        response = self.loader.generate(
+            self.model,
+            self.tokenizer,
             prompt,
-            add_special_tokens=False,  # This prevents template application!
-            return_tensors="pt",
-            max_length=512,
-            truncation=True,
-            padding=False
-        ).to(self.model.device)
-        
-        # Log tokenization for verification
+            max_new_tokens=128,
+            temperature=temperature,
+            top_p=0.9 if temperature > 0.0 else None,
+            repetition_penalty=1.1
+        )
+
+        # Get token preview for verification (tokenize just to check)
+        inputs = self.loader.tokenize_clean(self.tokenizer, prompt)
         first_10_tokens = inputs['input_ids'][0][:10].tolist()
         token_preview = self.tokenizer.decode(first_10_tokens, skip_special_tokens=True)
-        
-        # Generate response
-        with torch.no_grad():
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=128,
-                temperature=temperature,
-                do_sample=temperature > 0.0,
-                top_p=0.9 if temperature > 0.0 else None,
-                repetition_penalty=1.1,
-                eos_token_id=self.tokenizer.eos_token_id,
-                pad_token_id=self.tokenizer.eos_token_id,
-                return_dict_in_generate=True
-            )
-        
-        # Decode only new tokens
-        input_length = inputs['input_ids'].shape[1]
-        generated_tokens = outputs.sequences[0][input_length:]
-        response = self.tokenizer.decode(generated_tokens, skip_special_tokens=True).strip()
-        
+
         return {
             'prompt': prompt,
             'response': response,
