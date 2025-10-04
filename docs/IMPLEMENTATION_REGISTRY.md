@@ -193,6 +193,49 @@
 
 ## Data Generation
 
+### `generate_sample_data.py` ⭐ SAMPLE DATA FOR INSPECTION
+**Purpose**: Generate 50-100 examples with full provenance for manual inspection before expensive full runs
+**Key Features**:
+- Uses CleanModelLoader with provenance tracking
+- Full metadata capture (git commit, model, params, seeds)
+- Distributed across 6 instruction types (list, count, sort, filter, classify, extract)
+- Completion-style prompting (no instruction-following leakage)
+- Reproducible with seed parameter
+
+**Usage**:
+```bash
+# Generate 50 examples (default)
+python3 scripts/generate_sample_data.py
+
+# Generate 100 examples with specific seed
+python3 scripts/generate_sample_data.py --count 100 --seed 42
+```
+
+**Cost**: ~$1-2 (15-30 min on H100)
+**Output**: `artifacts/sample_sft_data_<timestamp>.jsonl`
+
+**Inspection Commands**:
+```bash
+# View first few examples
+jq '.' artifacts/sample_sft_data_*.jsonl | head -50
+
+# Check metadata
+jq '.metadata' artifacts/sample_sft_data_*.jsonl | head -1
+
+# Review responses
+jq '.response' artifacts/sample_sft_data_*.jsonl | head -20
+
+# Check for contamination (should find nothing)
+jq '.response' artifacts/sample_sft_data_*.jsonl | grep -i 'here is\\|here are\\|step 1'
+```
+
+**Decision Point**: If quality approved, proceed with full generation (15-20k)
+
+**Status**: ✅ Complete
+**Location**: `scripts/generate_sample_data.py`
+**Dependencies**: CleanModelLoader, CompletionStylePrompts, provenance_helper
+**Added**: 2025-10-04
+
 ### `generate_stage1_sft_data.py` ⭐ PRIMARY SFT DATA GENERATOR
 **Purpose**: Generate clean SFT training data for Stage 1
 **Lines**: ~700 lines

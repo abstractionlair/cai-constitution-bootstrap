@@ -90,37 +90,63 @@ All base model scripts now use CleanModelLoader with:
 - [x] Codex methodology review (2025-09-12)
 - [x] Review feedback converted to tasks
 
-### Deployment Preparation ⏳
+### Deployment Preparation ✅
 - [x] Create RunPod session plan (9-phase plan with decision points)
 - [x] Verify all critical fixes applied
 - [x] Identify scripts to transfer (verified clean)
 - [x] Create smoke test script for migration verification
-- [ ] P0: Fix evaluation memory bug (workaround exists: use sequential version)
-- [ ] Deploy to RunPod
-- [ ] Run smoke test on GPU (~5-10 min, ~$0.30) **REQUIRED before production**
-- [ ] Verify GPU setup and environment
+- [x] P0: Evaluation statistics implementation (McNemar, BH, Wilson CI, Cohen's h)
+- [x] P0: Provenance persistence implementation (git-based with queryable metadata)
+- [x] P2: Requirements.txt for reproducible environments
+- [x] Deploy to RunPod H100
+- [x] Run smoke test on GPU (~5-10 min, ~$0.047) ✅ ALL TESTS PASSED
+- [x] Verify GPU setup and environment
+- [x] Reviews completed (Codex ✅, Gemini ✅)
+- [x] Review findings addressed (exact McNemar, git fallback, BH clarification)
 
-**Target Completion**: 2025-10-15
+**Completed**: 2025-10-04
 
 ---
 
-## Milestone 3: Stage 1 Baseline & Training 📋 TODO
+## Milestone 3: Stage 1 Baseline & Training ⏳ DOING
 
 **Goal**: Run baseline assessment and complete first full training run
+
+**Budget**: $300 on H100 SXM 80GB @ $2.69/hr (~111 hours available)
+**Estimated**: ~82-87 H100-hours total (24-29 hour buffer)
 
 ### Evaluation Framework ✅
 - [x] Write instruction-following eval (self-contained, reviewable)
 - [x] Document eval methodology and metrics (12 test types, success criteria)
+- [x] Statistical analysis utilities (McNemar, BH correction, effect sizes, CIs)
+- [x] Provenance tracking for all artifacts
 - [ ] Test eval on base model (establish baseline ~10-30% expected) - **needs GPU**
 - [ ] Verify no chat template contamination in baseline - **needs GPU**
 
+### Sample Data Generation & Inspection 📋 NEW
+**Purpose**: Generate small sample with full provenance for inspection before full runs
+
+- [ ] Generate sample SFT data (50-100 examples, ~$1-2, ~15-30 min)
+  - With full provenance metadata (git commit, model, params, seeds)
+  - Test contamination controls working
+  - Verify prompt/response quality
+  - Check metadata completeness
+- [ ] Manual inspection of sample data
+  - Review 10-20 examples for quality
+  - Verify no instruction-following leakage
+  - Check response diversity and coherence
+  - Confirm metadata captured correctly
+- [ ] **DECISION POINT**: Approve quality before full generation
+
+**Why**: "Measure twice, cut once" - catch issues at $1-2 cost, not $20-30
+
 ### Baseline Assessment 📋
-- [ ] Run full evaluation on base model (Qwen-2.5-32B)
+- [ ] Run full evaluation on base model (Qwen-2.5-32B, N=1000)
 - [ ] Document base model capabilities
-- [ ] Save baseline results for comparison
+- [ ] Save baseline results with statistics for comparison
 
 ### Full Training Run 📋
-- [ ] Generate full SFT dataset (5-10k examples for 32B model)
+- [ ] Generate full SFT dataset (15-20k examples for 32B model, ~$20-30)
 - [ ] Train SFT model
 - [ ] Generate preference pairs from SFT model with improvements:
   - [ ] Use Best-of-N (BoN) sampling (k=2-4 candidates per prompt)
