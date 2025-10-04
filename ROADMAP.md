@@ -94,8 +94,10 @@ All base model scripts now use CleanModelLoader with:
 - [x] Create RunPod session plan (9-phase plan with decision points)
 - [x] Verify all critical fixes applied
 - [x] Identify scripts to transfer (verified clean)
+- [x] Create smoke test script for migration verification
 - [ ] P0: Fix evaluation memory bug (workaround exists: use sequential version)
 - [ ] Deploy to RunPod
+- [ ] Run smoke test on GPU (~5-10 min, ~$0.30) **REQUIRED before production**
 - [ ] Verify GPU setup and environment
 
 **Target Completion**: 2025-10-15
