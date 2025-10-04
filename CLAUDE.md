@@ -78,9 +78,45 @@ Assignments are flexible. While implementation is your primary role, you may occ
 
 ### After Implementing
 
+**⚠️ CRITICAL: Document IMMEDIATELY, not "later"**
+
 1. ✅ Update IMPLEMENTATION_REGISTRY with what you built
 2. ✅ Document any bugs fixed in KNOWN_BUGS_AND_FIXES
 3. ✅ Add docstrings and comments to code
+4. ✅ Update ROADMAP.md if milestone progress changed
+
+**Why this matters**: Incomplete documentation has caused us to:
+- Re-implement existing features multiple times
+- Re-introduce bugs we already fixed
+- Waste GPU time training on contaminated data
+- Lose context between sessions
+
+**Example**: The 60% registry gap (17/43 scripts documented) meant we couldn't check "does X exist?" reliably, leading to reimplementation.
+
+---
+
+## Session End Checklist
+
+**Before ending ANY session where you implemented, fixed, or created something**:
+
+```bash
+# 1. Did I create any new scripts?
+# → Add to IMPLEMENTATION_REGISTRY.md immediately
+
+# 2. Did I fix any bugs?
+# → Add to KNOWN_BUGS_AND_FIXES.md immediately
+
+# 3. Did I complete any milestones or tasks?
+# → Update ROADMAP.md immediately
+
+# 4. Did I discover anything important about the codebase?
+# → Add to relevant /docs/ file or create new doc
+
+# 5. Did I deprecate or archive anything?
+# → Mark clearly and create breadcrumb files
+```
+
+**Rule**: If you did work, you MUST update documentation before session ends. No exceptions.
 
 ---
 

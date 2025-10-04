@@ -140,7 +140,48 @@ When explicitly asked to implement analysis code:
 3. Create publication-quality visualizations
 4. Document all assumptions
 5. Make analysis reproducible (set seeds, log versions)
-6. Add to `/scripts/` and update IMPLEMENTATION_REGISTRY
+6. **Add to `/scripts/` and update IMPLEMENTATION_REGISTRY immediately**
+
+**⚠️ CRITICAL: Document IMMEDIATELY, not "later"**
+
+After implementing anything:
+- ✅ Update IMPLEMENTATION_REGISTRY.md with the new script
+- ✅ Document any bugs fixed in KNOWN_BUGS_AND_FIXES.md
+- ✅ Update ROADMAP.md if milestone progress changed
+- ✅ Add docstrings and comments to code
+
+**Why this matters**: Incomplete documentation has caused:
+- Re-implementation of existing features
+- Re-introduction of fixed bugs
+- Lost context between sessions
+- Wasted GPU costs on bad data/approaches
+
+---
+
+## Session End Checklist
+
+**Before ending ANY session where you implemented or reviewed something**:
+
+```bash
+# If you IMPLEMENTED something:
+# 1. Did I create any new scripts or analysis code?
+# → Add to IMPLEMENTATION_REGISTRY.md immediately
+
+# 2. Did I fix any bugs or methodological issues?
+# → Add to KNOWN_BUGS_AND_FIXES.md immediately
+
+# 3. Did I complete any milestones?
+# → Update ROADMAP.md immediately
+
+# If you REVIEWED something:
+# 1. Did I complete all assigned reviews?
+# → Create response files in /reviews/responses/
+
+# 2. Did my review identify systemic issues?
+# → Consider creating task or updating docs to prevent recurrence
+```
+
+**Rule**: If you did work, you MUST document it before session ends. No exceptions.
 
 ---
 

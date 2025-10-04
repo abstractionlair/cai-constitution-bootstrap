@@ -6,6 +6,50 @@ Comprehensive standards for the Constitutional AI Bootstrap project. All contrib
 
 ---
 
+## ⚠️ DOCUMENTATION-FIRST POLICY
+
+**RULE: Document work IMMEDIATELY when completing it, not "later"**
+
+### Why This Matters
+
+Incomplete documentation has repeatedly caused:
+- ❌ Re-implementation of existing features (wasted time)
+- ❌ Re-introduction of already-fixed bugs (wasted debugging)
+- ❌ Training on contaminated data (wasted GPU costs ~$5-10)
+- ❌ Lost context between sessions (inefficient work)
+
+**Example**: A 60% registry gap (17/43 scripts documented) meant we couldn't reliably check "does X exist?" before implementing, leading to multiple reimplementations.
+
+### Mandatory Documentation Updates
+
+**When you CREATE a script**:
+→ Add to IMPLEMENTATION_REGISTRY.md with: purpose, key features, status, location
+
+**When you FIX a bug**:
+→ Add to KNOWN_BUGS_AND_FIXES.md with: symptom, cause, fix, detection method
+
+**When you COMPLETE a milestone**:
+→ Update ROADMAP.md to mark progress
+
+**When you DISCOVER important patterns**:
+→ Add to relevant /docs/ file or create new technical doc
+
+**When you DEPRECATE code**:
+→ Mark clearly, create breadcrumb files, point to replacement
+
+### Session End Checklist
+
+Every agent must verify before ending a session:
+- [ ] Created scripts? → IMPLEMENTATION_REGISTRY updated
+- [ ] Fixed bugs? → KNOWN_BUGS_AND_FIXES updated
+- [ ] Completed milestones? → ROADMAP updated
+- [ ] Reviewed code? → Response files created
+- [ ] Discovered patterns? → Technical docs updated
+
+**No exceptions.** Documentation debt compounds quickly.
+
+---
+
 ## Table of Contents
 
 1. [File Organization](#file-organization)

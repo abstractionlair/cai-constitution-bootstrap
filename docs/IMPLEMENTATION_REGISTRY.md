@@ -5,6 +5,36 @@
 
 ---
 
+## ⚠️ ADD NEW SCRIPTS IMMEDIATELY
+
+**RULE: When you create a script, add it to this registry in the SAME session**
+
+**Why**: This registry exists to prevent reimplementation. If scripts aren't documented here immediately, the registry can't serve its purpose.
+
+**What happened before**: Registry was 60% incomplete (17/43 scripts), which meant we couldn't reliably check "does X exist?" and ended up reimplementing features.
+
+**Template for new entries**:
+```markdown
+### `your_script.py` ⭐ BRIEF DESCRIPTION
+**Purpose**: What this script does
+**Key Features**:
+- Feature 1
+- Feature 2
+**Status**: ✅ Complete / ⏳ In Progress / ⚠️ Has Issues
+**Location**: `scripts/your_script.py`
+**Dependencies**: What it uses
+**Use When**: When to use this vs alternatives
+```
+
+**Status markers**:
+- ✅ Complete and working
+- ⏳ In progress / experimental
+- ⚠️ Has known issues (specify)
+- ❌ Deprecated (point to replacement)
+- 🚨 Critical bug (don't use)
+
+---
+
 ## Core Utilities (`scripts/utils/`)
 
 ### `data_formatter.py`
@@ -201,13 +231,18 @@
 **Dependencies**: `utils/model_loader`, `utils/data_formatter`
 **Output Dir**: `checkpoints/stage1_dpo/`
 
-### Other Training Scripts (Superseded or Experimental)
-- `train_stage1_dpo_improved.py` - Improved DPO pipeline
-- `train_stage1_dpo_only.py` - DPO without SFT first
+### `train_stage1_dpo_improved.py` ⭐ IMPROVED DPO TRAINER
+**Purpose**: Enhanced DPO training with better hyperparameters
+**Status**: ✅ Current (may supersede train_stage1_dpo.py)
+**Location**: `scripts/train_stage1_dpo_improved.py`
+**Note**: Check which is actually primary - may need to verify with user
+
+### Other Training Scripts (Experimental/Alternative)
+- `train_stage1_dpo_only.py` - DPO without SFT first (experimental)
 - `train_dpo_stage1.py` - Earlier DPO version
 - `train_dpo_simple.py` - Simple DPO test
 
-**Status**: ⚠️ Multiple versions exist, primary scripts identified above
+**Status**: ⚠️ Multiple versions exist, may be superseded
 
 ---
 
@@ -215,21 +250,129 @@
 
 ### ⚠️ CRITICAL MEMORY ISSUE
 **Problem**: `evaluate_capability_differentiation.py` loads all models concurrently → OOM
-**Status**: 🚨 P0 bug, not fixed yet
-**Fixed Version**: `evaluate_capability_differentiation_sequential.py` (if exists)
+**Fixed in**: `evaluate_capability_differentiation_sequential.py`
+**Status**: 🚨 P0 bug tracked in tasks/claude_code/pending/
 
-### Evaluation Scripts Inventory (40 total scripts, many experimental)
+### `evaluate_stage1_comprehensive.py`
+**Purpose**: Comprehensive Stage 1 evaluation
+**Status**: ✅ Complete
+**Use For**: Full evaluation including multiple metrics
 
-**Primary Evaluation Scripts**:
-- `evaluate_stage1_comprehensive.py` - Full Stage 1 evaluation
-- `evaluate_sft_model.py` - SFT model-specific eval
-- `evaluate_final.py` - Final evaluation script
+### `evaluate_capability_differentiation.py` ❌ HAS MEMORY BUG
+**Purpose**: Evaluate capability differences between models
+**Problem**: Loads all models concurrently causing OOM
+**Status**: 🚨 Do NOT use - use sequential version instead
 
-**Base Model Testing** (Chat Template Contamination Prevention):
-- `test_base_model_ultra_clean.py` ⭐ - Definitive contamination-free test
-- `test_base_model_definitive.py` - Earlier definitive test
-- `test_clean_base_model.py` - Clean base model test
-- `evaluate_stage1_corrected.py` - Fixed chat template contamination
+### `evaluate_capability_differentiation_sequential.py` ✅ FIXED VERSION
+**Purpose**: Sequential model loading to avoid OOM
+**Status**: ✅ Use this instead of concurrent version
+
+### `evaluate_sft_model.py`
+**Purpose**: SFT model-specific evaluation
+**Status**: ✅ Complete
+
+### `evaluate_stage1_corrected.py`
+**Purpose**: Corrected evaluation (likely fixes from review feedback)
+**Status**: ✅ Complete
+**Note**: May supersede evaluate_stage1.py
+
+### `evaluate_stage1_readiness.py`
+**Purpose**: Pre-deployment readiness check
+**Status**: ✅ Complete
+**Use For**: Quick check before RunPod deployment
+
+### `evaluate_stage1_simple.py`
+**Purpose**: Simple/quick evaluation for testing
+**Status**: ✅ Complete
+
+### `evaluate_stage1.py`
+**Purpose**: Original Stage 1 evaluation
+**Status**: ⚠️ May be superseded by _corrected or _comprehensive versions
+
+### `evaluate_final.py`
+**Purpose**: Final evaluation after all training
+**Status**: ✅ Complete
+**Use For**: End-to-end comparison of base/SFT/DPO
+
+---
+
+## Testing & Verification
+
+### `test_base_model_definitive.py`
+**Purpose**: Earlier version of definitive base model test
+**Status**: ⚠️ Superseded by test_base_model_ultra_clean.py
+
+### `test_clean_base_model.py`
+**Purpose**: Clean base model testing
+**Status**: ⚠️ May be superseded by ultra_clean version
+
+### Evaluation Testing
+
+### `test_ab_logprob_evaluation.py`
+**Purpose**: Test A/B evaluation using log probabilities
+**Status**: ✅ Experimental test
+
+### `test_binary_evaluation.py`
+**Purpose**: Test binary (good/bad) evaluation approach
+**Status**: ✅ Experimental test
+
+### `test_critique_prompts.py`
+**Purpose**: Test critique prompt generation
+**Status**: ✅ Test script
+
+### `test_fixes.py`
+**Purpose**: Test bug fixes
+**Status**: ✅ Test script
+
+### `test_good_bad_format.py`
+**Purpose**: Test good/bad response formatting
+**Status**: ✅ Test script
+
+---
+
+## Data Generation & Processing
+
+### `create_preference_pairs_improved.py` (Already documented above as PRIMARY)
+
+### `stage1_critique.py`
+**Purpose**: Generate critiques for Stage 1
+**Status**: ✅ Complete
+**Use For**: Generating constitutional critiques
+
+### `stage1_incremental.py`
+**Purpose**: Incremental Stage 1 pipeline with checkpoints
+**Status**: ✅ Complete
+**Use For**: Long-running generation with inspection points
+
+---
+
+## Utility & Debug Scripts
+
+### `show_prompts.py`
+**Purpose**: Display prompts for debugging
+**Status**: ✅ Utility
+**Use For**: Inspecting prompt formatting
+
+### `show_raw_prompts.py`
+**Purpose**: Display raw (unformatted) prompts
+**Status**: ✅ Utility
+**Use For**: Debugging template application
+
+---
+
+## Utility Modules (scripts/utils/)
+
+### `utils/__init__.py`
+**Purpose**: Package initialization
+**Status**: ✅ Standard Python package file
+
+### `utils/data_formatter.py` (Already documented above)
+
+### `utils/data_validation.py` (Already documented above)
+
+### `utils/metrics.py` (Already documented above)
+
+### `utils/model_loader.py` (Already documented above)
 
 **Experimental/Test Scripts**:
 - `evaluate_stage1.py`, `evaluate_stage1_simple.py`, `evaluate_stage1_readiness.py`

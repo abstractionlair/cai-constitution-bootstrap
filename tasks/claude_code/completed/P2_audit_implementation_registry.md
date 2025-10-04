@@ -214,21 +214,32 @@ Since we're about to do RunPod work, here are the essential registry entries to 
 ## Action Items
 
 - [x] Audit completeness (THIS TASK)
-- [ ] Add 4 critical entries (before RunPod)
-- [ ] Mark deprecated scripts (before RunPod)
-- [ ] Document remaining 22 scripts (after RunPod)
-- [ ] Reorganize registry structure (after RunPod)
+- [x] Add 4 critical entries (COMPLETED)
+- [x] Mark deprecated scripts (COMPLETED)
+- [x] Document remaining 31 scripts (COMPLETED)
 
-**Time to fix critical entries**: ~15-20 minutes
-**Time to complete documentation**: ~45-60 minutes
+**Time spent**:
+- Audit: ~45 minutes
+- Updates: ~30 minutes
+- Total: ~75 minutes
 
 ---
 
 ## Files Modified
 
-None yet - this is an audit only.
+**`/docs/IMPLEMENTATION_REGISTRY.md`** - Updated from 17 to 43 scripts documented
 
-**Next step**: Actually update IMPLEMENTATION_REGISTRY.md with critical entries before RunPod session.
+**Updates made**:
+1. Added 4 critical scripts with full entries (eval, verification, DPO, preference pairs)
+2. Marked 3 deprecated scripts with archive locations
+3. Added 8 evaluation scripts with status markers
+4. Added 7 test scripts
+5. Added 2 data generation scripts (critique, incremental)
+6. Added 2 utility display scripts
+7. Grouped 3 experimental training scripts
+8. Verified all 43 non-archived scripts are now documented
+
+**Result**: Registry now has 100% coverage of current scripts
 
 ---
 

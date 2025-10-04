@@ -139,7 +139,53 @@ When explicitly asked to implement something:
 4. Include error handling
 5. Make it compatible with existing pipeline
 6. Test implementation
-7. Add to IMPLEMENTATION_REGISTRY
+7. **Add to IMPLEMENTATION_REGISTRY immediately**
+
+**⚠️ CRITICAL: Document IMMEDIATELY, not "later"**
+
+After implementing anything:
+- ✅ Update IMPLEMENTATION_REGISTRY.md with the new script
+- ✅ Document any bugs fixed in KNOWN_BUGS_AND_FIXES.md
+- ✅ Update ROADMAP.md if milestone progress changed
+- ✅ Add docstrings and comments to code
+
+**Why this matters**: Incomplete documentation has caused:
+- Re-implementation of existing features
+- Re-introduction of fixed bugs
+- Lost context between sessions
+- Wasted GPU costs on bad data/approaches
+
+**Example**: The 60% registry gap (17/43 scripts) prevented us from checking "does X exist?" and led to reimplementation.
+
+---
+
+## Session End Checklist
+
+**Before ending ANY session where you implemented or reviewed something**:
+
+```bash
+# If you IMPLEMENTED something:
+# 1. Did I create any new scripts?
+# → Add to IMPLEMENTATION_REGISTRY.md immediately
+
+# 2. Did I fix any bugs or performance issues?
+# → Add to KNOWN_BUGS_AND_FIXES.md immediately
+
+# 3. Did I complete any milestones?
+# → Update ROADMAP.md immediately
+
+# 4. Did I discover important patterns or gotchas?
+# → Add to relevant /docs/ file
+
+# If you REVIEWED something:
+# 1. Did I complete all assigned reviews?
+# → Create response files in /reviews/responses/
+
+# 2. Did my review identify critical issues?
+# → Flag them clearly and consider creating task
+```
+
+**Rule**: If you did work, you MUST document it before session ends. No exceptions.
 
 ---
 

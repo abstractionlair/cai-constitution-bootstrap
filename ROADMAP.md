@@ -6,6 +6,19 @@ Progress markers: ✅ Done | ⏳ In Progress | 📋 Todo
 
 ---
 
+## ⚠️ KEEP THIS UPDATED
+
+**When you complete work, update this roadmap IMMEDIATELY:**
+- Completed task? → Change 📋 to ✅
+- Started work? → Change 📋 to ⏳
+- Finished milestone subsection? → Change section marker to ✅
+
+**Why**: This roadmap is the primary way we track progress. If it's out of date, we lose visibility into what's done and what remains.
+
+**Rule**: Update ROADMAP.md in the same session where you complete work, not later.
+
+---
+
 ## Milestone 1: Foundation Infrastructure ✅ DONE
 
 **Goal**: Establish project structure, documentation, and development workflow
@@ -34,20 +47,25 @@ Progress markers: ✅ Done | ⏳ In Progress | 📋 Todo
 - [x] Evaluation script (`evaluate_stage1_comprehensive.py`)
 - [x] Utility modules (CompletionStylePrompts, model_loader, data_validation)
 
-### Data Generation ✅
-- [x] 200 SFT training examples generated
-- [x] 188 preference pairs created
+### Data Generation ⏳
+- [x] 200 SFT training examples generated (Sep 12 - **DEPRECATED: incomplete format**)
+- [x] 188 preference pairs created (Sep 11 - **DEPRECATED: predates clean script**)
 - [x] 130 held-out test instructions
 - [x] Few-shot completion prompting implemented
 - [x] Chat template contamination fix applied
 - [x] Base model completion mode verified (no instruction template leakage)
+- [ ] **Regenerate clean SFT data** (5-10k examples) - **needs GPU**
+- [ ] **Regenerate preference pairs** (10-30k with BoN) - **needs GPU**
 
-### Critical Fixes ⏳
+### Critical Fixes ✅
 - [x] Chat template contamination documented and fixed (BASE_MODEL_TRUTH.md)
 - [x] Base model completion mode implementation (CompletionStylePrompts)
 - [x] Few-shot prompting architecture implemented
 - [x] Loss masking for SFT implemented
-- [ ] P0: Evaluation memory management bug
+- [x] Deprecated contaminated scripts (archived 3 scripts)
+- [x] P1: Data provenance investigation (existing data incomplete/contaminated)
+- [x] P2: IMPLEMENTATION_REGISTRY audit and completion (17→43 scripts documented)
+- [ ] P0: Evaluation memory management bug (documented, sequential version exists)
 - [ ] P0: Statistical rigor improvements
 - [ ] P1: Data quality verification
 
@@ -56,10 +74,11 @@ Progress markers: ✅ Done | ⏳ In Progress | 📋 Todo
 - [x] Codex methodology review (2025-09-12)
 - [x] Review feedback converted to tasks
 
-### Deployment Preparation 📋
-- [ ] Fix P0 evaluation bug
-- [ ] Verify all critical fixes applied
-- [ ] Test pipeline locally (dry run)
+### Deployment Preparation ⏳
+- [x] Create RunPod session plan (9-phase plan with decision points)
+- [x] Verify all critical fixes applied
+- [x] Identify scripts to transfer (verified clean)
+- [ ] P0: Fix evaluation memory bug (workaround exists: use sequential version)
 - [ ] Deploy to RunPod
 - [ ] Verify GPU setup and environment
 
@@ -71,11 +90,11 @@ Progress markers: ✅ Done | ⏳ In Progress | 📋 Todo
 
 **Goal**: Run baseline assessment and complete first full training run
 
-### Evaluation Framework 📋
-- [ ] Write instruction-following eval (self-contained, reviewable)
-- [ ] Test eval on base model (establish baseline ~10-30% expected)
-- [ ] Verify no chat template contamination in baseline
-- [ ] Document eval methodology and metrics
+### Evaluation Framework ✅
+- [x] Write instruction-following eval (self-contained, reviewable)
+- [x] Document eval methodology and metrics (12 test types, success criteria)
+- [ ] Test eval on base model (establish baseline ~10-30% expected) - **needs GPU**
+- [ ] Verify no chat template contamination in baseline - **needs GPU**
 
 ### Baseline Assessment 📋
 - [ ] Run full evaluation on base model (Qwen-2.5-32B)
@@ -255,6 +274,6 @@ Progress markers: ✅ Done | ⏳ In Progress | 📋 Todo
 
 ---
 
-**Last Updated**: 2025-10-03
+**Last Updated**: 2025-10-03 (post local-prep session)
 
 See `/status/PROJECT_STATUS.md` for current narrative and context.

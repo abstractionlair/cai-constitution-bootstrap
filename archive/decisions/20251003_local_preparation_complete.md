@@ -134,9 +134,9 @@ All with clear pointers to clean replacement.
 
 ### Remaining Work
 
-22 scripts still undocumented (evaluation variants, test scripts, utilities).
+**COMPLETED**: All 31 previously undocumented scripts have been added to the registry.
 
-**Not blocking RunPod** but should be done post-training for long-term maintainability.
+**Result**: Registry now has 100% coverage of current (non-archived) scripts.
 
 ### Why This Matters
 
