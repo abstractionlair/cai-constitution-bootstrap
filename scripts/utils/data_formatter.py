@@ -154,33 +154,39 @@ Another {instruction_type} pattern would be:"""
     
     @staticmethod
     def create_response_generation_prompt(instruction: str) -> str:
-        """Create prompt to generate response to instruction via completion"""
-        
+        """Create prompt to generate response to instruction via completion
+
+        Uses ###END### delimiter to signal completion boundary and prevent
+        model from continuing with additional Q&A pairs.
+        """
+
         # Enhanced few-shot examples with diverse instruction types
+        # Each example includes ###END### marker to teach model to stop
         examples = [
             # Mathematical
             {'instruction': 'The answer to "What is 2+2?" is:', 'response': '4'},
-            
+
             # Completion
             {'instruction': 'Complete this sentence: The sun rises in the', 'response': 'east'},
-            
+
             # Factual
             {'instruction': 'Here is a fact about dogs:', 'response': 'Dogs are loyal and friendly companions to humans.'},
-            
+
             # Creative
             {'instruction': 'Write a short sentence about winter:', 'response': 'Snow blankets the quiet landscape in pristine white.'},
-            
-            # Explanation  
+
+            # Explanation
             {'instruction': 'Explain what photosynthesis is:', 'response': 'Photosynthesis is the process by which plants convert sunlight into energy.'}
         ]
-        
+
         # Use 3-4 examples randomly selected for diversity
         selected_examples = random.sample(examples, min(4, len(examples)))
-        
+
         prompt = "Here are examples of prompts and their completions:\n\n"
         for ex in selected_examples:
-            prompt += f"{ex['instruction']}\n{ex['response']}\n\n"
-        
+            # Add ###END### delimiter after each response to signal completion boundary
+            prompt += f"{ex['instruction']}\n{ex['response']}\n###END###\n\n"
+
         prompt += f"{instruction}\n"
         return prompt
     

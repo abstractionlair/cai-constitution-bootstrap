@@ -221,7 +221,12 @@ def generate_sample_dataset(count: int = 50, seed: int = 42):
                 do_sample=True
             )
 
-            # Clean up response (remove trailing whitespace, extra newlines)
+            # Clean up response
+            # 1. Stop at ###END### delimiter (prevents multi-QA generation)
+            if '###END###' in response:
+                response = response.split('###END###')[0]
+
+            # 2. Remove trailing whitespace, extra newlines
             response = response.strip()
 
             # Create training format

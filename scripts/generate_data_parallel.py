@@ -266,6 +266,11 @@ def generate_dataset_slice(
             )
 
             # Clean up response
+            # 1. Stop at ###END### delimiter (prevents multi-QA generation)
+            if '###END###' in response:
+                response = response.split('###END###')[0]
+
+            # 2. Remove trailing whitespace, extra newlines
             response = response.strip()
 
             # Create training format
