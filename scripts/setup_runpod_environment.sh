@@ -143,61 +143,92 @@ echo "   timeout 10 python3 -c \"import torch; print('Torch:', torch.__version__
 echo ""
 
 # ============================================================================
-# 3. Claude Code Installation
+# 3. Node.js and npm Installation
 # ============================================================================
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "3. Installing Claude Code"
+echo "3. Installing Node.js and npm"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-# Check if already installed
+# Check if npm is available
+if command -v npm &> /dev/null; then
+    echo "npm already installed: $(npm --version)"
+else
+    echo ""
+    echo "Installing Node.js and npm..."
+
+    # Try to install nodejs (method depends on OS)
+    if command -v apt-get &> /dev/null; then
+        apt-get update -qq
+        apt-get install -y -qq nodejs npm
+    elif command -v yum &> /dev/null; then
+        yum install -y -q nodejs npm
+    else
+        echo "❌ Cannot install Node.js automatically."
+        echo "   Please install Node.js and npm manually, then re-run this script."
+        exit 1
+    fi
+
+    echo "✅ npm installed: $(npm --version)"
+fi
+
+echo ""
+
+# ============================================================================
+# 4. Claude Code Installation
+# ============================================================================
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "4. Installing Claude Code"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# Try to find claude in common locations
+CLAUDE_PATH=""
 if command -v claude &> /dev/null; then
-    echo "Claude Code already installed: $(which claude)"
-    echo "Version: $(claude --version 2>/dev/null || echo 'unknown')"
+    CLAUDE_PATH=$(which claude)
+elif [ -x "/usr/local/bin/claude" ]; then
+    CLAUDE_PATH="/usr/local/bin/claude"
+elif [ -x "$HOME/.npm-global/bin/claude" ]; then
+    CLAUDE_PATH="$HOME/.npm-global/bin/claude"
+fi
+
+# Check if already installed
+if [ -n "$CLAUDE_PATH" ]; then
+    echo "Claude Code already installed: $CLAUDE_PATH"
+    echo "Version: $($CLAUDE_PATH --version 2>/dev/null || echo 'unknown')"
     read -p "Reinstall? (y/N): " reinstall
     if [[ ! $reinstall =~ ^[Yy]$ ]]; then
         echo "Skipping Claude Code installation"
     else
         echo "Reinstalling Claude Code..."
         npm install -g @anthropic-ai/claude-code
+        echo "✅ Claude Code reinstalled"
     fi
 else
     echo ""
     echo "Installing Claude Code via npm..."
-
-    # Check if npm is available
-    if ! command -v npm &> /dev/null; then
-        echo "❌ npm not found. Installing Node.js and npm..."
-
-        # Try to install nodejs (method depends on OS)
-        if command -v apt-get &> /dev/null; then
-            apt-get update -qq
-            apt-get install -y -qq nodejs npm
-        elif command -v yum &> /dev/null; then
-            yum install -y -q nodejs npm
-        else
-            echo "❌ Cannot install Node.js automatically."
-            echo "   Please install Node.js and npm manually, then run:"
-            echo "   npm install -g @anthropic-ai/claude-code"
-            exit 1
-        fi
-    fi
-
-    echo "Installing Claude Code..."
     npm install -g @anthropic-ai/claude-code
 
-    echo ""
-    echo "✅ Claude Code installed: $(which claude)"
+    # Verify installation
+    if command -v claude &> /dev/null; then
+        echo ""
+        echo "✅ Claude Code installed: $(which claude)"
+    else
+        echo ""
+        echo "⚠️  Claude Code installed but not in PATH"
+        echo "   Try: export PATH=\$PATH:/usr/local/bin"
+        echo "   Or check: npm root -g"
+    fi
 fi
 
 echo ""
 
 # ============================================================================
-# 4. Project Setup
+# 5. Project Setup
 # ============================================================================
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "4. Project Setup"
+echo "5. Project Setup"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 cd /workspace
