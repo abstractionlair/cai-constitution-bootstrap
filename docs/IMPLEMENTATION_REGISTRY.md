@@ -61,15 +61,34 @@
 **Status**: ✅ Complete
 **Use When**: Loading any SFT training data
 
-### `model_loader.py`
-**Purpose**: Model loading with proper quantization
+### `model_loader.py` ⚠️ DEPRECATED FOR BASE MODEL EVALUATION
+**Purpose**: Model loading with proper quantization (Unsloth-based)
 **Key Functions**:
-- `load_base_model()` - Loads Qwen-2.5-32B with 4-bit quantization
+- `load_base_model()` - Loads models via Unsloth
 - `clear_gpu_cache()` - GPU memory management
 - `print_gpu_utilization()` - Monitoring utilities
 
+**Status**: ⚠️ Does NOT disable chat_template - use for TRAINING only
+**Critical**: For base model evaluation/generation, use `clean_model_loader.py` instead
+
+### `clean_model_loader.py` ⭐ SAFE BASE MODEL LOADER
+**Purpose**: GUARANTEED contamination-free base model loading
+**Key Class**: `CleanModelLoader`
+**Key Features**:
+- ✅ Explicitly disables `chat_template` and `default_chat_template`
+- ✅ Uses `add_special_tokens=False` for tokenization
+- ✅ Verifies no template markers in tokens
+- ✅ Logs all safety checks
+- ✅ Provides clean `generate()` method
+- ✅ Works with raw transformers (not Unsloth)
+
 **Status**: ✅ Complete
-**Critical**: Always use this, don't reimplement model loading
+**Critical**: Use this for ALL base model evaluation and data generation
+**Use When**:
+- Evaluating base model capabilities
+- Generating training data from base model
+- Any scenario where chat template contamination would invalidate results
+**Don't Use When**: Training (use `model_loader.py` with Unsloth for efficiency)
 
 ### `metrics.py`
 **Purpose**: Evaluation metrics
