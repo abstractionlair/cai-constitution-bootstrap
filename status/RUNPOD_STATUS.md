@@ -1,8 +1,9 @@
 # RunPod Instance Status
 
-**Last Updated**: 2025-10-03
-**Instance**: A100 SXM 80GB
-**Cost**: $1.74/hour
+**Last Updated**: 2025-10-04
+**Strategy**: Opportunistically using available RunPod GPUs (H100, A100, or other high-end GPUs)
+**Current Session**: 2x H100 SXM 80GB @ ~$5.38/hour
+**Budget**: $300 total for experimentation
 
 ---
 

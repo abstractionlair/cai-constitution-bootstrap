@@ -98,7 +98,7 @@ All base model scripts now use CleanModelLoader with:
 - [x] P0: Evaluation statistics implementation (McNemar, BH, Wilson CI, Cohen's h)
 - [x] P0: Provenance persistence implementation (git-based with queryable metadata)
 - [x] P2: Requirements.txt for reproducible environments
-- [x] Deploy to RunPod H100
+- [x] Deploy to RunPod GPU (opportunistically using H100, A100, or other available GPUs)
 - [x] Run smoke test on GPU (~5-10 min, ~$0.047) ✅ ALL TESTS PASSED
 - [x] Verify GPU setup and environment
 - [x] Reviews completed (Codex ✅, Gemini ✅)
@@ -112,8 +112,9 @@ All base model scripts now use CleanModelLoader with:
 
 **Goal**: Run baseline assessment and complete first full training run
 
-**Budget**: $300 on H100 SXM 80GB @ $2.69/hr (~111 hours available)
-**Estimated**: ~82-87 H100-hours total (24-29 hour buffer)
+**Budget**: $300 total for experimentation
+**Hardware**: Opportunistically using available RunPod GPUs (H100, A100, etc.) in single or multi-GPU configurations
+**Estimated compute**: ~80-110 GPU-hours total (varies by GPU type and availability)
 
 ### Evaluation Framework ✅
 - [x] Write instruction-following eval (self-contained, reviewable)

@@ -219,10 +219,10 @@ See `/reviews/README.md` for review request template.
 
 ## Key Constraints
 
-- **Hardware**: RunPod A100 SXM 80GB GPU
+- **Hardware**: RunPod GPU pods (opportunistically using available high-end GPUs: H100, A100, etc. in single or multi-GPU configurations)
 - **Model**: Qwen-2.5-32B base model
 - **Framework**: Unsloth for efficient training
-- **Budget**: ~$1.74/hour - be efficient
+- **Budget**: $300 total for full experiment (~$2-3/hour typical GPU cost)
 - **Quantization**: 4-bit for training, 8-bit/16-bit for inference
 
 ---
