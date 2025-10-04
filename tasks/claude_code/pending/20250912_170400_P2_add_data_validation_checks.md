@@ -1,4 +1,5 @@
 # P2: Add Data Validation Checks Across Pipeline
+**Assigned To**: claude_code
 Source: Gemini Review 20250912_165500  
 Priority: MEDIUM (P2)
 Estimated Time: 30 minutes

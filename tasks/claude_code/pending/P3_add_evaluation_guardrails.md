@@ -1,4 +1,5 @@
 # P3: Add Evaluation Guardrails and Monitoring
+**Assigned To**: claude_code
 
 **Source:** Codex Pre-Deployment Review (2025-09-11)
 **Priority:** P3 (Low - robustness enhancement)

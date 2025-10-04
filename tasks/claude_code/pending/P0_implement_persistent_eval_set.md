@@ -1,6 +1,7 @@
 # P0: Implement Persistent Held-Out Evaluation Set
 
 **Priority**: P0 (CRITICAL - Blocking valid results)
+**Assigned To**: claude_code
 **Estimated Time**: 45 minutes
 **Created**: 2024-12-28 16:30
 **Source**: Codex Review 20241228_160000_corrected_p0_implementation.md

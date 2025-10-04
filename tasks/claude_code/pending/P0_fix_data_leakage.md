@@ -1,6 +1,7 @@
 # P0: Fix Cross-Run Data Leakage
 
 **Priority**: P0 (CRITICAL - Invalidates results)
+**Assigned To**: claude_code
 **Estimated Time**: 1 hour
 **Created**: 2024-12-28 16:10
 **Source**: Codex Review 20241228_153500_p0_fixes.md

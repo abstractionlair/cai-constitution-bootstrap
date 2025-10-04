@@ -1,4 +1,5 @@
 # P1: Improve Initial Data Quality with Base Model Generation
+**Assigned To**: claude_code
 Source: Gemini Review 20250912_165500
 Priority: HIGH (P1)
 Estimated Time: 45 minutes

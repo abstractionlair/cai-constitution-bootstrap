@@ -1,4 +1,5 @@
 # P2: Strengthen Loss Masking Robustness in SFT Training
+**Assigned To**: claude_code
 Source: Gemini Review 20250912_165500
 Priority: MEDIUM (P2)
 Estimated Time: 20 minutes

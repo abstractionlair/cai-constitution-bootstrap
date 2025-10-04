@@ -1,6 +1,7 @@
 # P0: Fix Template Placeholder Mismatch Bug
 
 **Priority**: P0 (FATAL - Will crash at runtime)
+**Assigned To**: claude_code
 **Estimated Time**: 15 minutes
 **Created**: 2024-12-28 16:05
 **Source**: Codex Review 20241228_153500_p0_fixes.md

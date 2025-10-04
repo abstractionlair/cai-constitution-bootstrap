@@ -1,4 +1,5 @@
 # P3: Remove Redundant raw_instructions.jsonl Save
+**Assigned To**: claude_code
 
 **Source:** Gemini Pre-Deployment Review (2025-09-10)
 **Priority:** P3 (Low - minor cleanup)

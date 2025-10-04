@@ -1,6 +1,7 @@
 # P0: Fix Evaluation Prompt Mismatch
 
 **Priority**: P0 (HIGH - Biases results)
+**Assigned To**: claude_code
 **Estimated Time**: 30 minutes
 **Created**: 2024-12-28 16:15
 **Source**: Codex Review 20241228_153500_p0_fixes.md

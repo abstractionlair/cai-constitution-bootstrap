@@ -1,6 +1,7 @@
 # P0: Fix Critical Memory Management in Evaluation Script
 Source: Gemini Review 20250912_165500
 Priority: CRITICAL (P0)
+**Assigned To**: claude_code
 Estimated Time: 30 minutes
 
 ## Issue Description

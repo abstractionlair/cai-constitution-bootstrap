@@ -1,4 +1,5 @@
 # P1: Add DPO-Only Baseline for Methodology Validation
+**Assigned To**: claude_code
 Source: Codex Review 20250912_165500
 Priority: HIGH (P1)
 Estimated Time: 60 minutes

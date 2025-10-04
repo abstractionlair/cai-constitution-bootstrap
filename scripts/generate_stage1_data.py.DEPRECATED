@@ -1,0 +1,12 @@
+This script has been deprecated and moved to:
+scripts/archived/2025_10_03_chat_template_contaminated/generate_stage1_data.py
+
+Reason: Chat template contamination - uses model_loader.load_base_model which does not disable tokenizer.chat_template
+Also superseded by more complete generate_stage1_sft_data.py
+
+Note: This script likely generated the Sep 10, 2025 data in data/stage1/train_instructions.jsonl
+That data may be contaminated and should be regenerated with the clean script.
+
+Use instead: scripts/generate_stage1_sft_data.py
+
+See docs/DEPRECATED_SCRIPTS.md and docs/BASE_MODEL_TRUTH.md for details.

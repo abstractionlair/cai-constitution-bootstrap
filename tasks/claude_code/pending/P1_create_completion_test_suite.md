@@ -1,6 +1,8 @@
 # P1: Create Completion-Style Test Suite
+**Assigned To**: claude_code
 
 **Priority**: P1 (High - Needed to verify fixes)
+**Assigned To**: claude_code
 **Estimated Time**: 1.0 hour
 **Created**: 2024-12-28 14:40
 

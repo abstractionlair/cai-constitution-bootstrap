@@ -2,6 +2,7 @@
 
 ## Task: Switch to deterministic evaluation and add statistical tests
 Priority: P0 (CRITICAL - affects validity)
+**Assigned To**: claude_code
 Estimated Time: 0.75 hours
 Created: 2024-12-28 13:00
 Created By: Claude (Project)

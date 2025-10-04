@@ -1,78 +1,76 @@
-# Constitutional AI Bootstrap Experiment
+# Automated Post-Training Experiment
 
-An experiment in maximally automated Constitutional AI training, where a base model bootstraps its own alignment through self-critique and constitutional principles.
+## The Core Idea
 
-## Status
+One of my takeaways from reading about constitutional AI was that base models already "understand" many concepts, harmlessness just being one example. They just don't reliably express them without post-training.
 
-Work in progress.
+This project explores: **How much post-training can we automate using that observation?** Beyond just safety.
 
-## Project Goal
+Can a base model generate its own training data, critique itself using principles it already understands, and bootstrap its way to aligned behavior—with minimal human intervention?
 
-Implement and document a fully automated Constitutional AI training pipeline that uses a base model (Qwen-2.5-32B) to:
-1. Generate diverse tasks through self-instruction
-2. Critique its own responses against constitutional principles  
-3. Create revised, improved responses
-4. Train on preference pairs using DPO/ORPO
-5. Demonstrate alignment improvements through benchmarks
+---
 
-## Key Features
+## The Approach
 
-- **Maximum Automation**: Minimal human intervention in the training loop
-- **Reproducibility**: All steps scriptable and deterministic
-- **Safety First**: Constitutional safeguards and responsible release practices
-- **Publication Ready**: Comprehensive documentation of methods and results
+Instead of jumping straight to full Constitutional AI, we teach capabilities progressively:
 
-## Technical Stack
+**Stage 1**: Explicit instruction following (foundation) ← *Currently here*
+**Stage 2**: Implicit instructions (questions & context)
+**Stage 3**: Generation tasks (create examples)
+**Stage 4**: Evaluation tasks (judge quality)
+**Stage 5**: Revision tasks (improve text)
+**Stage 6**: Constitutional integration (full CAI)
 
-- **Model**: Qwen-2.5-32B base model
-- **Hardware**: RunPod A100 SXM 80GB GPU
-- **Training**: QLoRA + DPO via Unsloth/TRL
-- **Safety**: Llama Guard 3-8B for content filtering
-- **Inference**: Flexible - can run at 4-bit, 8-bit, or 16-bit
+Each stage produces a functional model that helps generate training data for the next stage. True bootstrapping.
 
-## Project Structure
+---
 
-```
-cai_experiment/
-├── constitution.yaml          # Constitutional principles
-├── scripts/
-│   ├── setup_environment.sh   # Dependencies installation
-│   ├── generate_data.py       # Main data generation pipeline
-│   ├── train_dpo.py          # DPO training script
-│   └── evaluate.py           # Basic evaluation
-├── data/                     # Generated datasets
-├── checkpoints/              # Model checkpoints
-├── specs/                    # Implementation specifications
-└── logs/                     # Generation and training logs
-```
+## Goals
 
-## Milestones
+- **Maximum automation** in the training pipeline
+- **Progressive capability building** (each stage enables the next)
+- **Reproducible methodology** (all steps scriptable and documented)
+- **Budget-friendly research** (~$150 total)
+- **Publication-quality results** with comprehensive documentation
 
-### Progressive Bootstrapping (6 Stages)
-1. **Stage 1**: Explicit instruction following (foundation)
-2. **Stage 2**: Implicit instructions (questions & context)
-3. **Stage 3**: Generation tasks (create examples)
-4. **Stage 4**: Evaluation tasks (judge quality)
-5. **Stage 5**: Revision tasks (improve text)
-6. **Stage 6**: Constitutional integration (full CAI)
 
-Each stage produces a functional model that helps generate training data for the next stage.
+---
 
-## Budget
+## Navigation
 
-- Target: $50-150 for complete experiment
-- Stages 1-5: ~$10-14 each (~$50-70 total)
-- Stage 6 (Constitutional): ~$20-30
-- Buffer for experimentation: ~$30-50
-- Total: Well within personal project range
+**New to this project?**
 
-## Safety & Ethics
+1. **This file** - Project goals and approach
+2. **[ROADMAP.md](ROADMAP.md)** - Milestones and progress
+3. **[/docs/TECHNICAL_SETUP.md](/docs/TECHNICAL_SETUP.md)** - Model, hardware, training details
+4. **[/docs/STANDARDS.md](/docs/STANDARDS.md)** - How we work
+5. **[/status/PROJECT_STATUS.md](/status/PROJECT_STATUS.md)** - Current focus
 
-- Default safe constitutional principles (HHH-focused)
-- Llama Guard filtering for harmful content
-- Staged release (code → data → optional weights)
-- OpenRAIL licensing for responsible use
+**Want to understand the code?**
 
-## License
+- **[/docs/IMPLEMENTATION_REGISTRY.md](/docs/IMPLEMENTATION_REGISTRY.md)** - Catalog of scripts
+- **[/docs/KNOWN_BUGS_AND_FIXES.md](/docs/KNOWN_BUGS_AND_FIXES.md)** - Bug history
+- **[/docs/BASE_MODEL_TRUTH.md](/docs/BASE_MODEL_TRUTH.md)** - Critical quirks
+- **[/scripts/](/scripts/)** - Implementation
 
-OpenRAIL - See LICENSE file for details
+**For AI agents:**
+
+- **Claude Code** (implementer): [CLAUDE.md](CLAUDE.md)
+- **Gemini** (technical review): [GEMINI.md](GEMINI.md)
+- **Codex** (methodology review): [codex.md](codex.md)
+
+---
+
+## Current Status
+
+Working on Stage 1 (teaching explicit instruction following). See [ROADMAP.md](ROADMAP.md) for progress.
+
+---
+
+## About
+
+This is a personal research project exploring automated post-training methods. It's heavily AI-assisted (Claude Code for implementation, Gemini and Codex for review), which is itself an experiment in human-AI collaboration for research.
+
+---
+
+**Questions?** See `/docs/STANDARDS.md` for how things work, or `/status/PROJECT_STATUS.md` for current context.

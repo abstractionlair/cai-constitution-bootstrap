@@ -1,0 +1,9 @@
+This script has been deprecated and moved to:
+scripts/archived/2025_10_03_chat_template_contaminated/stage1_generate.py
+
+Reason: Chat template contamination - does not disable tokenizer.chat_template
+This causes the base model to behave like an instruction-tuned model, invalidating baseline evaluation.
+
+Use instead: scripts/generate_stage1_sft_data.py (line 130 disables chat_template)
+
+See docs/DEPRECATED_SCRIPTS.md and docs/BASE_MODEL_TRUTH.md for details.
