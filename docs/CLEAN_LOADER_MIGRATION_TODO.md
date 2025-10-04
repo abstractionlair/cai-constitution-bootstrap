@@ -1,32 +1,39 @@
 # CleanModelLoader Migration TODO
 
 **Created**: 2025-10-04
-**Status**: IN PROGRESS (3/15 scripts migrated)
+**Status**: ✅ COMPLETE (15/15 scripts migrated)
+**Completed**: 2025-10-04
 
 ---
 
 ## Progress
 
-### ✅ Completed (3/15)
+### ✅ All Scripts Migrated (15/15)
 
-1. **evaluate_instruction_following.py** - Migrated in previous session
-2. **generate_stage1_sft_data.py** - Migrated in previous session
-3. **test_base_model_ultra_clean.py** - Migrated (lines 7-76, tested ✓)
-4. **test_clean_base_model.py** - Migrated (lines 7-40, tested ✓)
+1. **evaluate_instruction_following.py** - ✅ Migrated
+2. **generate_stage1_sft_data.py** - ✅ Migrated
+3. **test_base_model_ultra_clean.py** - ✅ Migrated
+4. **test_clean_base_model.py** - ✅ Migrated
+5. **test_base_model_definitive.py** - ✅ Migrated
+6. **evaluate_sft_model.py** - ✅ Migrated
+7. **evaluate_final.py** - ✅ Migrated
+8. **evaluate_stage1_comprehensive.py** - ✅ Migrated
+9. **evaluate_stage1_readiness.py** - ✅ Migrated
+10. **evaluate_stage1_corrected.py** - ✅ Migrated
+11. **evaluate_capability_differentiation.py** - ✅ Migrated
+12. **evaluate_capability_differentiation_sequential.py** - ✅ Migrated
+13. **create_preference_pairs_improved.py** - ✅ Migrated
+14. **train_stage1_sft.py** - ✅ Migrated
+15. **train_stage1_dpo_improved.py** - ✅ Migrated
 
-### ⏳ Remaining (11/15)
+### Verification
 
-5. **test_base_model_definitive.py**
-6. **evaluate_capability_differentiation_sequential.py**
-7. **evaluate_capability_differentiation.py**
-8. **evaluate_stage1_comprehensive.py**
-9. **evaluate_stage1_readiness.py**
-10. **evaluate_final.py**
-11. **evaluate_sft_model.py**
-12. **evaluate_stage1_corrected.py**
-13. **create_preference_pairs_improved.py**
-14. **train_stage1_dpo_improved.py**
-15. **train_stage1_sft.py**
+- ✅ `scripts/verify_migration_complete.sh` passes
+- ✅ 0 manual `chat_template = None` patterns found
+- ✅ All scripts compile successfully
+- ✅ 16 scripts confirmed using CleanModelLoader
+
+**See**: `/docs/MIGRATION_STATUS_20251004.md` for detailed migration notes
 
 ---
 

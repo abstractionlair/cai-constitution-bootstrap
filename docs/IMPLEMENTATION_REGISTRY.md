@@ -77,25 +77,27 @@
 **Key Features**:
 - ✅ Explicitly disables `chat_template` and `default_chat_template`
 - ✅ Uses `add_special_tokens=False` for tokenization
-- ✅ Verifies no template markers in tokens
-- ✅ Logs all safety checks
+- ✅ Checks ALL tokens for contamination (not just first 10)
+- ✅ Uses token IDs (QWEN_CHAT_TOKEN_IDS: 151644, 151645)
+- ✅ Runs sentinel prompt tests at load time
+- ✅ Returns provenance tracking (git SHA, quantization, etc.)
 - ✅ Provides clean `generate()` method
 - ✅ Works with raw transformers (not Unsloth)
 
-**Status**: ✅ Complete - ⚠️ **MIGRATION INCOMPLETE (2/15 scripts migrated)**
+**Status**: ✅ Complete - ✅ **MIGRATION COMPLETE (15/15 scripts migrated)**
 **Critical**: Use this for ALL base model evaluation and data generation
 
 **Migration Status**:
-- **Migrated (2)**: evaluate_instruction_following.py, generate_stage1_sft_data.py
-- **Remaining (13)**: See CLEAN_MODEL_LOADER_MIGRATION.md for complete list
-- **Blocker**: Until all scripts migrated, we have TWO patterns (utility vs manual)
-- **See**: `/docs/CLEAN_MODEL_LOADER_MIGRATION.md` for migration plan
+- **✅ Complete**: All 15 base model scripts now use CleanModelLoader
+- **Verification**: `scripts/verify_migration_complete.sh` passes (0 manual patterns found)
+- **Scripts**: evaluate_*, create_preference_pairs, train_stage1_* all migrated
+- **See**: `/docs/MIGRATION_STATUS_20251004.md` for details
 
 **Use When**:
 - Evaluating base model capabilities
 - Generating training data from base model
+- Training (replaces manual contamination prevention)
 - Any scenario where chat template contamination would invalidate results
-**Don't Use When**: Training (use `model_loader.py` with Unsloth for efficiency)
 
 ### `metrics.py`
 **Purpose**: Evaluation metrics
