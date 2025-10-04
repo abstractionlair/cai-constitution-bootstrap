@@ -148,6 +148,7 @@ After implementing anything:
 - ✅ Document any bugs fixed in KNOWN_BUGS_AND_FIXES.md
 - ✅ Update ROADMAP.md if milestone progress changed
 - ✅ Add docstrings and comments to code
+- ✅ **If creating shared utility, migrate ALL callers (no partial refactoring)**
 
 **Why this matters**: Incomplete documentation has caused:
 - Re-implementation of existing features
@@ -156,6 +157,23 @@ After implementing anything:
 - Wasted GPU costs on bad data/approaches
 
 **Example**: The 60% registry gap (17/43 scripts) prevented us from checking "does X exist?" and led to reimplementation.
+
+---
+
+### ⚠️ CRITICAL: Partial Refactoring = Reimplementation
+
+**Creating utility but not migrating all callers leaves multiple sources of truth.**
+
+This causes the SAME problems as reimplementation:
+- ❌ Inconsistent behavior (utility vs old pattern)
+- ❌ Maintenance burden (fix bug in N places)
+- ❌ Future confusion ("which pattern do I follow?")
+- ❌ Documentation lies ("use utility" but most don't)
+- ❌ Drift over time (implementations diverge)
+
+**Rule**: Migrate ALL callers OR don't create utility yet.
+
+**See**: `/docs/STANDARDS.md#dry-principle--single-implementation` for full policy.
 
 ---
 

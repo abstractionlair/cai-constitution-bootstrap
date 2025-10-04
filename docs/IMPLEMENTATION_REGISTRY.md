@@ -1,6 +1,6 @@
 # Implementation Registry
 
-**Last Updated**: 2025-10-03
+**Last Updated**: 2025-10-04
 **Purpose**: Track what's been implemented to prevent re-implementation
 
 ---
@@ -82,8 +82,15 @@
 - ✅ Provides clean `generate()` method
 - ✅ Works with raw transformers (not Unsloth)
 
-**Status**: ✅ Complete
+**Status**: ✅ Complete - ⚠️ **MIGRATION INCOMPLETE (2/15 scripts migrated)**
 **Critical**: Use this for ALL base model evaluation and data generation
+
+**Migration Status**:
+- **Migrated (2)**: evaluate_instruction_following.py, generate_stage1_sft_data.py
+- **Remaining (13)**: See CLEAN_MODEL_LOADER_MIGRATION.md for complete list
+- **Blocker**: Until all scripts migrated, we have TWO patterns (utility vs manual)
+- **See**: `/docs/CLEAN_MODEL_LOADER_MIGRATION.md` for migration plan
+
 **Use When**:
 - Evaluating base model capabilities
 - Generating training data from base model

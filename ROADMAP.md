@@ -39,6 +39,21 @@ Progress markers: ✅ Done | ⏳ In Progress | 📋 Todo
 
 **Goal**: Build complete SFT→DPO training pipeline for explicit instruction following
 
+### 🚨 BLOCKER: CleanModelLoader Migration Incomplete
+
+**Status**: 4/15 scripts migrated to centralized clean model loading
+**Blocking**: All GPU evaluation and data generation work
+**Risk**: Running scripts with manual contamination prevention may fail safety checks
+**See**: `/docs/CLEAN_LOADER_MIGRATION_TODO.md` for migration status
+
+**Completed**: evaluate_instruction_following.py, generate_stage1_sft_data.py, test_base_model_ultra_clean.py, test_clean_base_model.py
+
+**Remaining (11)**: test_base_model_definitive.py, evaluate_capability_differentiation_sequential.py, evaluate_capability_differentiation.py, evaluate_stage1_comprehensive.py, evaluate_stage1_readiness.py, evaluate_final.py, evaluate_sft_model.py, evaluate_stage1_corrected.py, create_preference_pairs_improved.py, train_stage1_dpo_improved.py, train_stage1_sft.py
+
+**Must complete** before running any base model evaluations or data generation on GPU.
+
+---
+
 ### Core Pipeline ✅
 - [x] Data generation script (`generate_stage1_sft_data.py`)
 - [x] SFT training script (`train_stage1_sft.py`)

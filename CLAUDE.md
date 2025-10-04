@@ -84,6 +84,7 @@ Assignments are flexible. While implementation is your primary role, you may occ
 2. ✅ Document any bugs fixed in KNOWN_BUGS_AND_FIXES
 3. ✅ Add docstrings and comments to code
 4. ✅ Update ROADMAP.md if milestone progress changed
+5. ✅ **If creating shared utility, migrate ALL callers (no partial refactoring)**
 
 **Why this matters**: Incomplete documentation has caused us to:
 - Re-implement existing features multiple times
@@ -92,6 +93,25 @@ Assignments are flexible. While implementation is your primary role, you may occ
 - Lose context between sessions
 
 **Example**: The 60% registry gap (17/43 scripts documented) meant we couldn't check "does X exist?" reliably, leading to reimplementation.
+
+---
+
+### ⚠️ CRITICAL: Partial Refactoring = Reimplementation
+
+**Creating utility but not migrating all callers leaves multiple sources of truth.**
+
+This causes the SAME problems as reimplementation:
+- ❌ Inconsistent behavior (utility vs old pattern)
+- ❌ Maintenance burden (fix bug in N places)
+- ❌ Future confusion ("which pattern do I follow?")
+- ❌ Documentation lies ("use utility" but most don't)
+- ❌ Drift over time (implementations diverge)
+
+**Rule**: Migrate ALL callers OR don't create utility yet.
+
+**Example**: Creating `CleanModelLoader` but leaving 13/15 scripts with manual `chat_template = None` means we have TWO patterns, not one. This is WORSE than having one consistent (bad) pattern.
+
+**See**: `/docs/STANDARDS.md#dry-principle--single-implementation` for full policy.
 
 ---
 

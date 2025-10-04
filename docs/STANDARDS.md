@@ -168,6 +168,186 @@ Every agent must verify before ending a session:
 2. **Document immediately**: Update `IMPLEMENTATION_REGISTRY.md` after creating
 3. **Fix bugs once**: Document in `KNOWN_BUGS_AND_FIXES.md`
 4. **Reproducibility**: Set seeds, log versions, save configs
+5. **DRY Principle**: Every piece of functionality in EXACTLY ONE place
+6. **Complete refactoring**: Migrate ALL callers when creating shared utilities
+
+---
+
+## DRY Principle & Single Implementation
+
+### ⚠️ CORE RULE
+
+**EVERY piece of functionality MUST exist in EXACTLY ONE place**
+
+**Partial refactoring is NO BETTER than reimplementation.**
+
+Both create the same problems:
+- ❌ Multiple sources of truth
+- ❌ Inconsistent behavior
+- ❌ Maintenance burden (fix bug in N places)
+- ❌ Future confusion ("which pattern do I follow?")
+- ❌ Drift over time (implementations diverge)
+- ❌ Documentation ambiguity
+
+### The Partial Refactoring Anti-Pattern
+
+**Scenario**: You notice duplication, create a shared utility, migrate 2/15 callers, move on.
+
+**Problem**: You've made things WORSE, not better.
+
+**Before refactoring**:
+- 15 scripts with same logic (bad)
+- At least it's consistently bad
+- Everyone knows the pattern
+
+**After partial refactoring**:
+- 13 scripts with old logic
+- 2 scripts with new logic
+- 1 utility that "should" be used
+- Now there are TWO patterns
+- Documentation says "use utility" but most scripts don't
+- Future contributors: "which do I follow?"
+
+**Result**: More confusion than before refactoring started.
+
+### When Creating Shared Utilities
+
+**Required steps** (NO exceptions):
+
+1. **Implement utility** in `scripts/utils/`
+2. **Count ALL callers** of old pattern
+3. **Migrate EVERY caller** - no "we'll do it later"
+4. **Delete old implementations** - don't leave "working" duplicates
+5. **Verify no old pattern remains** in active code
+6. **Update documentation** - mark old pattern as deprecated
+7. **Update IMPLEMENTATION_REGISTRY** with migration completion
+
+**Before committing**:
+```bash
+# Example: Verify no manual chat_template disabling remains
+grep -l "chat_template = None" scripts/*.py
+# Should return ZERO results (except the utility itself)
+```
+
+### Migration is NOT Optional
+
+❌ **WRONG approaches**:
+- "Script X already works, we'll migrate it later"
+- "Just use the new pattern for new scripts"
+- "Partial migration is fine for now"
+- "We're in a hurry, migration can wait"
+- "That script isn't critical, skip it"
+
+✅ **RIGHT approaches**:
+- Migrate ALL callers in the same session as creating utility
+- If too many callers (>20), DON'T create utility yet - plan first
+- Complete migration BEFORE committing/merging
+- If migration blocked, revert the utility creation
+
+### Planning Large Refactorings
+
+**If 10+ callers exist**:
+
+1. **Create task first**: `/tasks/claude_code/pending/refactor_X.md`
+2. **List all callers**: Document what needs migration
+3. **Estimate time**: Be realistic (1-2 hrs for 10-15 scripts)
+4. **Get approval**: Don't surprise user with large migration
+5. **Execute atomically**: Complete migration in one session
+6. **Test thoroughly**: Verify all scripts still compile/work
+
+**If too large for one session**:
+- Split into logical batches
+- Each batch is complete (no partial state)
+- Mark incomplete batches as BLOCKERS
+
+### Example: CleanModelLoader
+
+**Created**: `scripts/utils/clean_model_loader.py`
+
+**Callers identified**: 15 scripts with `tokenizer.chat_template = None`
+
+**Migration requirement**: ALL 15 must be migrated
+
+**Status check**:
+```bash
+# Count remaining manual implementations
+grep -l "chat_template = None" scripts/*.py | wc -l
+```
+
+**Until count = 0**: Migration is INCOMPLETE
+
+**Consequences of incomplete migration**:
+- Cannot claim "we prevent contamination centrally"
+- Future scripts don't know which pattern to follow
+- Bug in manual implementations won't be caught
+- Documentation lies ("use CleanModelLoader" but most don't)
+
+### Only Valid Exception
+
+**Scripts in `scripts/archived/`** can keep old patterns:
+- Already deprecated
+- Won't be executed
+- Kept for historical reference only
+
+**All other scripts MUST migrate** - no exceptions.
+
+### Verification Checklist
+
+Before committing ANY shared utility:
+
+- [ ] Utility implemented and tested
+- [ ] **ALL callers identified and counted**
+- [ ] **ALL callers migrated (100%, not 80%)**
+- [ ] Old pattern deleted (not commented out)
+- [ ] Grep confirms no old pattern in active scripts
+- [ ] IMPLEMENTATION_REGISTRY marks utility as canonical
+- [ ] Documentation updated to forbid old pattern
+- [ ] Agent configs warn against old pattern
+- [ ] All migrated scripts compile successfully
+
+**If ANY checkbox is unchecked**: Migration is incomplete, revert or finish.
+
+### Real Cost of Partial Refactoring
+
+**Example from this project**:
+
+Created `CleanModelLoader`, migrated 2/15 scripts, called it done.
+
+**Actual cost**:
+- 30 min to create utility ✅
+- 20 min to migrate 2 scripts ✅
+- **2-3 hours remaining** to migrate other 13 ❌ DEFERRED
+- Now have 2 patterns instead of 1 ❌
+- Documentation inconsistency ❌
+- Future confusion guaranteed ❌
+
+**Better approach**:
+- 30 min to create utility
+- 2-3 hours to migrate ALL 15 scripts
+- Result: ONE pattern, complete consistency
+- OR: Don't create utility until we have time for complete migration
+
+### Enforcing Complete Refactoring
+
+**Code reviews must check**:
+- "Did you migrate all callers?"
+- "How many scripts still use old pattern?"
+- "Why is migration incomplete?"
+
+**IMPLEMENTATION_REGISTRY must show**:
+- Migration status for each utility
+- List of remaining callers if incomplete
+- BLOCKER warnings for incomplete migrations
+
+**ROADMAP must block**:
+- Incomplete migrations block deployment
+- Inconsistent patterns = failed milestone
+
+### Remember
+
+**Partial refactoring = technical debt**
+
+Don't create debt unless absolutely necessary. Complete the work or don't start it.
 
 ### Python Style
 

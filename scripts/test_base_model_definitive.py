@@ -10,7 +10,6 @@ import json
 import logging
 from pathlib import Path
 from datetime import datetime
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 import sys
 import os
 import time
@@ -22,6 +21,9 @@ logger = logging.getLogger(__name__)
 # Setup paths
 BASE_DIR = Path(os.getenv('CAI_BASE_DIR', '/workspace/runs/stage1_20250911_131105/code'))
 ARTIFACTS_DIR = BASE_DIR / "artifacts"
+sys.path.insert(0, str(BASE_DIR / 'scripts'))
+
+from utils.clean_model_loader import CleanModelLoader
 
 class BaseModelTester:
     """Test raw base model capabilities definitively"""
@@ -30,77 +32,36 @@ class BaseModelTester:
         """Initialize tester"""
         self.model = None
         self.tokenizer = None
+        self.loader = None
+        self.provenance = None
         self.results = {
             'timestamp': datetime.now().isoformat(),
             'model': 'Qwen/Qwen2.5-32B',
             'test_categories': {},
             'summary': {}
         }
-    
+
     def load_base_model(self):
-        """Load the raw base model - NO fine-tuning, NO adapters"""
+        """Load the raw base model via CleanModelLoader"""
         logger.info("🤖 Loading RAW Qwen2.5-32B base model (no fine-tuning)...")
-        
-        # Quantization for memory efficiency
-        bnb_config = BitsAndBytesConfig(
-            load_in_8bit=True,
-            bnb_8bit_use_double_quant=True,
-            bnb_8bit_quant_type="nf8",
-            bnb_8bit_compute_dtype=torch.bfloat16
-        )
-        
-        # Load tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            "Qwen/Qwen2.5-32B",
-            trust_remote_code=True,
-            padding_side='right'
-        )
-        
-        # CRITICAL: Disable chat template - we want raw model
-        self.tokenizer.chat_template = None
-        
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
-        
-        # Load model
-        self.model = AutoModelForCausalLM.from_pretrained(
-            "Qwen/Qwen2.5-32B",
-            quantization_config=bnb_config,
-            device_map="auto",
-            trust_remote_code=True,
-            dtype=torch.bfloat16,
-            attn_implementation="flash_attention_2" if torch.cuda.is_available() else "eager"
-        )
-        
-        self.model.eval()
-        logger.info("✅ Raw base model loaded successfully")
+
+        # Use CleanModelLoader for guaranteed contamination-free loading
+        self.loader = CleanModelLoader("Qwen/Qwen2.5-32B", load_in_8bit=True)
+        self.model, self.tokenizer, self.provenance = self.loader.load()
+
+        logger.info("✅ Raw base model loaded successfully via CleanModelLoader")
+        logger.info(f"📋 Loader version: {self.provenance['loader_version'][:8]}")
     
     def generate_completion(self, prompt: str, max_new_tokens: int = 50) -> str:
-        """Generate a raw completion from the base model"""
-        inputs = self.tokenizer(
+        """Generate a raw completion from the base model via CleanModelLoader"""
+        return self.loader.generate(
+            self.model,
+            self.tokenizer,
             prompt,
-            return_tensors="pt",
-            truncation=True,
-            max_length=512
-        ).to(self.model.device)
-        
-        with torch.no_grad():
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=max_new_tokens,
-                temperature=0.1,  # Low temperature for consistent results
-                do_sample=True,
-                pad_token_id=self.tokenizer.pad_token_id,
-                eos_token_id=self.tokenizer.eos_token_id
-            )
-        
-        # Decode only the new tokens
-        response = self.tokenizer.decode(
-            outputs[0][inputs['input_ids'].shape[1]:], 
-            skip_special_tokens=True
+            max_new_tokens=max_new_tokens,
+            temperature=0.1,  # Low temperature for consistent results
+            do_sample=True
         )
-        
-        return response.strip()
     
     def test_raw_completion(self):
         """Test 1: Raw text completion (what base models are trained for)"""
