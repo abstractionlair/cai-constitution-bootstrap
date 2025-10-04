@@ -3,12 +3,35 @@
 **Created**: 2025-10-04
 **Status**: Design recommendations (not yet implemented)
 **Priority**: HIGH (from Codex review)
+**Note**: This is a design/recommendations document. Consider moving to a design queue once we have organizational standards for such documents.
 
 ---
 
-## Overview
+## Core Policy: Git Commit Hash as Source of Truth
 
-CleanModelLoader now returns provenance metadata:
+**Key decision**: Always deploy code from git and include commit hash in all artifacts.
+
+**Why this simplifies everything**:
+- Commit hash lets us look up exact code, dependencies, and configuration
+- Don't need to capture every parameter - just enough to identify the run
+- Reproducibility comes from git history, not trying to serialize everything
+
+**Minimum required metadata**:
+```python
+{
+    'git_commit': get_git_sha(),        # Full SHA, not short
+    'timestamp': datetime.now().isoformat(),
+    'artifact_type': 'training_data' | 'evaluation' | 'model'
+}
+```
+
+Everything else can be derived from the commit if needed.
+
+---
+
+## CleanModelLoader Provenance
+
+CleanModelLoader returns provenance metadata:
 ```python
 provenance = {
     'loader_version': git_sha,           # Git SHA of loader code
@@ -43,7 +66,7 @@ example = {
 }
 ```
 
-**Recommended**:
+**Recommended** (minimal):
 ```python
 example = {
     **inst_data,
@@ -52,22 +75,20 @@ example = {
     'prompt': self.create_completion_prompt(...),
     'completion': f" {response}\nEND",
     'metadata': {
-        'provenance': self.provenance,
-        'script_version': self._get_git_sha(),  # Script git SHA
-        'generation_params': {
-            'seed': self.seed,
-            'temperature': 0.7,
-            'max_new_tokens': 150
-        },
-        'timestamp': datetime.now().isoformat()
+        'git_commit': get_git_sha(),            # REQUIRED: Full commit SHA
+        'timestamp': datetime.now().isoformat(), # REQUIRED: When generated
+        'loader_version': self.provenance['loader_version']  # Redundant but useful
     }
 }
 ```
 
 **Benefits**:
-- Per-record traceability
-- Can identify which records came from which loader version
-- Can regenerate with exact same configuration
+- Commit hash = source of truth (can look up all generation params in code)
+- Timestamp = when it was generated
+- Loader version = quick check without git checkout
+
+**Optional additions** (if useful for filtering/searching):
+- `seed`, `temperature`, `max_new_tokens` (but these should be in code at that commit)
 
 ### 2. Evaluation Reports (JSON outputs)
 
@@ -75,7 +96,7 @@ example = {
 
 **Current**: Most don't save provenance
 
-**Recommended** (top-level metadata):
+**Recommended** (minimal top-level metadata):
 ```python
 evaluation_report = {
     'summary': {
@@ -84,20 +105,11 @@ evaluation_report = {
         # ... existing metrics
     },
     'metadata': {
-        'provenance': provenance,           # From loader.load()
-        'script_version': get_git_sha(),    # Script SHA
-        'eval_seed': 42,
-        'timestamp': datetime.now().isoformat(),
-        'decoding_params': {
-            'temperature': 0.7,
-            'do_sample': True,
-            'max_new_tokens': 150
-        },
-        'dataset': {
-            'name': 'held_out_test_set',
-            'size': 12,
-            'version': test_set_sha  # If applicable
-        }
+        'git_commit': get_git_sha(),                     # REQUIRED: Full SHA
+        'timestamp': datetime.now().isoformat(),         # REQUIRED: When run
+        'loader_version': provenance['loader_version'],  # From loader.load()
+        'dataset_name': 'held_out_test_set',            # What was evaluated
+        'dataset_size': 12                               # N
     },
     'results': [
         # ... existing per-example results
@@ -106,48 +118,39 @@ evaluation_report = {
 ```
 
 **Benefits**:
-- Can verify evaluation configuration
-- Compare evaluations with same/different loaders
-- Track methodology changes over time
+- Commit hash = source of truth for eval script, decoding params, etc.
+- Loader version = quick contamination check
+- Dataset info = what was tested
 
-### 3. Session-Level Manifest
+**Note**: Don't need to serialize decoding params - they're in the script at that commit
 
-**Recommended**: Create manifest at start of GPU session
+### 3. Session-Level Manifest (Optional)
+
+**Recommended**: Simple manifest logged at session start
 
 **File**: `artifacts/session_manifest_{timestamp}.json`
 
-**Content**:
+**Content** (minimal):
 ```python
 {
-    'session_id': timestamp,
+    'session_start': datetime.now().isoformat(),
+    'git_commit': get_git_sha(),                    # Full SHA
+    'git_branch': get_git_branch(),
     'environment': {
-        'python_version': sys.version,
-        'torch_version': torch.__version__,
-        'transformers_version': transformers.__version__,
-        'gpu': torch.cuda.get_device_name(0),
-        'git_sha': get_git_sha()
+        'python': sys.version.split()[0],
+        'torch': torch.__version__,
+        'transformers': transformers.__version__,
+        'cuda': torch.version.cuda if torch.cuda.is_available() else None
     },
-    'loader_config': {
-        'provenance': provenance,
-        'model_name': "Qwen/Qwen2.5-32B",
-        'quantization': "nf4"
-    },
-    'artifacts_generated': [
-        {
-            'file': 'sft_training_data_20251004.jsonl',
-            'type': 'training_data',
-            'count': 200,
-            'timestamp': '...'
-        },
-        # ... other artifacts
-    ]
+    'artifacts': []  # Can append as generated, or just use for reference
 }
 ```
 
 **Benefits**:
-- Single source of truth for session configuration
-- Can reference from multiple artifacts
-- Simplifies artifact tracking
+- Quick environment check
+- Session-level git commit for reference
+
+**Note**: This is optional since every artifact has its own git_commit. Mainly useful for debugging environment issues.
 
 ---
 
@@ -177,25 +180,54 @@ evaluation_report = {
 **Recommended**: Create `utils/provenance_helper.py`
 
 ```python
-def get_git_sha(short=False):
-    """Get current git SHA"""
-    import subprocess
-    sha = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode().strip()
-    return sha[:8] if short else sha
+import subprocess
+from datetime import datetime
+from pathlib import Path
 
-def create_artifact_metadata(provenance, script_path, **kwargs):
-    """Create standardized metadata for any artifact"""
-    return {
-        'provenance': provenance,
-        'script_version': get_git_sha(),
-        'script_name': Path(script_path).name,
-        'timestamp': datetime.now().isoformat(),
-        **kwargs
+def get_git_sha():
+    """Get current git SHA (full, not short)"""
+    return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode().strip()
+
+def get_git_branch():
+    """Get current git branch"""
+    return subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD']).decode().strip()
+
+def create_artifact_metadata(provenance=None, **extra):
+    """Create minimal standardized metadata for any artifact
+
+    Args:
+        provenance: Optional provenance dict from CleanModelLoader.load()
+        **extra: Any additional metadata to include
+
+    Returns:
+        Dict with git_commit, timestamp, and optional loader_version
+    """
+    metadata = {
+        'git_commit': get_git_sha(),
+        'timestamp': datetime.now().isoformat()
     }
 
-def create_session_manifest(provenance, session_dir):
-    """Create session-level manifest"""
-    # ... implementation
+    if provenance:
+        metadata['loader_version'] = provenance['loader_version']
+
+    metadata.update(extra)
+    return metadata
+```
+
+**Usage**:
+```python
+# In data generation
+example['metadata'] = create_artifact_metadata(
+    provenance=self.provenance,
+    artifact_type='training_data'
+)
+
+# In evaluation
+report['metadata'] = create_artifact_metadata(
+    provenance=provenance,
+    dataset_name='held_out_test',
+    dataset_size=len(test_examples)
+)
 ```
 
 ---
@@ -203,14 +235,11 @@ def create_session_manifest(provenance, session_dir):
 ## Migration Impact
 
 **Result Comparability**:
-- Pre-migration results (before CleanModelLoader) not comparable
-- Post-migration results with different loader versions need careful comparison
-- Provenance tracking enables identifying comparable results
+- Pre-migration results (Sept 2025) are not referenced in any docs
+- No plan to use them for comparison
+- All production results will be post-migration with provenance
 
-**Recommendation**: Create `docs/METHODOLOGY_CHANGE_NOTICE.md` documenting:
-- Migration cutover date (2025-10-04)
-- Pre/post migration differences
-- Result comparability policy
+**No action needed**: Old artifacts exist but aren't part of any analysis
 
 ---
 
@@ -218,14 +247,15 @@ def create_session_manifest(provenance, session_dir):
 
 **After implementation**:
 ```bash
-# Check data generation includes provenance
-jq '.metadata.provenance' artifacts/sft_training_data_*.jsonl | head -1
+# Check data generation includes git_commit
+jq '.metadata.git_commit' artifacts/sft_training_data_*.jsonl | head -1
 
-# Check evaluation reports include provenance
-jq '.metadata.provenance' artifacts/evaluation_*.json | head -1
+# Check evaluation reports include git_commit
+jq '.metadata.git_commit' artifacts/evaluation_*.json | head -1
 
-# Check session manifest exists
-ls artifacts/session_manifest_*.json
+# Verify commit is valid
+git cat-file -t $(jq -r '.metadata.git_commit' artifacts/evaluation_*.json | head -1)
+# Should output: commit
 ```
 
 ---
@@ -241,9 +271,17 @@ ls artifacts/session_manifest_*.json
 
 ## Status
 
-- ✅ Design complete
-- ⏳ Implementation pending
-- ⏳ Helper utility pending
-- ⏳ Methodology change notice pending
+- ✅ Design complete (simplified based on "git commit as source of truth" policy)
+- ⏳ Helper utility pending (`utils/provenance_helper.py`)
+- ⏳ Data generation metadata pending
+- ⏳ Evaluation report metadata pending
 
-**Next steps**: Implement session manifest generation, then migrate data generation and evaluation scripts.
+**Key simplification**:
+- Always deploy from git → commit hash is sufficient provenance
+- Everything else can be looked up from the commit
+- Minimal metadata: `git_commit`, `timestamp`, `loader_version`
+
+**Next steps**:
+1. Create `utils/provenance_helper.py`
+2. Update `generate_stage1_sft_data.py` to add metadata
+3. Update evaluation scripts to add metadata
