@@ -7,25 +7,30 @@
 
 ---
 
-## Core Policy: Git Commit Hash as Source of Truth
+## Core Policy: Git Commit Hash as Safety Net
 
 **Key decision**: Always deploy code from git and include commit hash in all artifacts.
 
-**Why this simplifies everything**:
-- Commit hash lets us look up exact code, dependencies, and configuration
-- Don't need to capture every parameter - just enough to identify the run
-- Reproducibility comes from git history, not trying to serialize everything
+**Git commit is a backup**, not a replacement for capturing useful metadata:
+- Commit hash ensures we CAN look up anything if needed
+- But looking up details in git history is difficult and slow
+- **Capture anything we're likely to want to query, filter, or understand**
 
-**Minimum required metadata**:
+**Balance**:
+- Don't serialize everything (that's what git is for)
+- DO capture what you'll want to see without digging through code
+- Think: "What will I want to filter/search/compare by?"
+
+**Required minimum**:
 ```python
 {
-    'git_commit': get_git_sha(),        # Full SHA, not short
-    'timestamp': datetime.now().isoformat(),
+    'git_commit': get_git_sha(),                  # Safety net - can look up anything
+    'timestamp': datetime.now().isoformat(),      # When generated
     'artifact_type': 'training_data' | 'evaluation' | 'model'
 }
 ```
 
-Everything else can be derived from the commit if needed.
+**But also capture** anything likely to be useful (see examples below).
 
 ---
 
@@ -66,7 +71,7 @@ example = {
 }
 ```
 
-**Recommended** (minimal):
+**Recommended**:
 ```python
 example = {
     **inst_data,
@@ -75,20 +80,37 @@ example = {
     'prompt': self.create_completion_prompt(...),
     'completion': f" {response}\nEND",
     'metadata': {
-        'git_commit': get_git_sha(),            # REQUIRED: Full commit SHA
-        'timestamp': datetime.now().isoformat(), # REQUIRED: When generated
-        'loader_version': self.provenance['loader_version']  # Redundant but useful
+        # Safety net
+        'git_commit': get_git_sha(),                      # REQUIRED: Can look up anything
+        'timestamp': datetime.now().isoformat(),          # REQUIRED: When generated
+
+        # Model provenance (will want to filter/compare by these)
+        'loader_version': self.provenance['loader_version'],
+        'model_name': self.provenance['model_name'],      # "Qwen/Qwen2.5-32B"
+        'quantization': self.provenance['quantization'],  # "nf4", "fp16", etc.
+        'template_disabled': True,                        # Contamination check
+
+        # Generation params (will want to know these without code lookup)
+        'seed': self.seed,                                # Reproducibility
+        'temperature': 0.7,                               # Sampling params
+        'max_new_tokens': 150,
+        'do_sample': True,
+
+        # Context
+        'script_name': Path(__file__).name,
+        'artifact_type': 'training_data'
     }
 }
 ```
 
-**Benefits**:
-- Commit hash = source of truth (can look up all generation params in code)
-- Timestamp = when it was generated
-- Loader version = quick check without git checkout
+**What to capture** (questions we'll want to answer without git):
+- Which model version generated this?
+- Was contamination prevention applied?
+- What sampling parameters were used?
+- Can I reproduce this with the same seed?
+- Which script generated this?
 
-**Optional additions** (if useful for filtering/searching):
-- `seed`, `temperature`, `max_new_tokens` (but these should be in code at that commit)
+**Git commit answers**: What was the code/environment/dependencies at generation time?
 
 ### 2. Evaluation Reports (JSON outputs)
 
@@ -96,7 +118,7 @@ example = {
 
 **Current**: Most don't save provenance
 
-**Recommended** (minimal top-level metadata):
+**Recommended**:
 ```python
 evaluation_report = {
     'summary': {
@@ -105,11 +127,40 @@ evaluation_report = {
         # ... existing metrics
     },
     'metadata': {
-        'git_commit': get_git_sha(),                     # REQUIRED: Full SHA
+        # Safety net
+        'git_commit': get_git_sha(),                     # REQUIRED: Can look up anything
         'timestamp': datetime.now().isoformat(),         # REQUIRED: When run
-        'loader_version': provenance['loader_version'],  # From loader.load()
-        'dataset_name': 'held_out_test_set',            # What was evaluated
-        'dataset_size': 12                               # N
+
+        # Model provenance (will want to compare evaluations)
+        'loader_version': provenance['loader_version'],
+        'model_name': provenance['model_name'],
+        'quantization': provenance['quantization'],
+        'template_disabled': True,
+
+        # Models evaluated (key for comparisons)
+        'models': {
+            'base': 'Qwen/Qwen2.5-32B',
+            'sft': str(SFT_CHECKPOINT),
+            'dpo': str(DPO_CHECKPOINT) if evaluated else None
+        },
+
+        # Decoding params (will want to know without code lookup)
+        'temperature': 0.7,
+        'do_sample': True,
+        'max_new_tokens': 150,
+        'eval_seed': 42,
+
+        # Dataset (critical for understanding results)
+        'dataset': {
+            'name': 'held_out_test_set',
+            'size': 12,
+            'source': 'data/test_instructions.json',
+            'version_sha': dataset_git_sha  # If dataset is versioned
+        },
+
+        # Context
+        'script_name': Path(__file__).name,
+        'artifact_type': 'evaluation'
     },
     'results': [
         # ... existing per-example results
@@ -117,40 +168,68 @@ evaluation_report = {
 }
 ```
 
-**Benefits**:
-- Commit hash = source of truth for eval script, decoding params, etc.
-- Loader version = quick contamination check
-- Dataset info = what was tested
+**What to capture** (questions we'll want to answer without git):
+- Which models were compared?
+- What were the decoding parameters?
+- What dataset was used and how large?
+- Was contamination prevention applied?
+- Can I compare this to other evaluations?
 
-**Note**: Don't need to serialize decoding params - they're in the script at that commit
+**Git commit answers**: What was the exact evaluation code/logic?
 
-### 3. Session-Level Manifest (Optional)
+### 3. Session-Level Manifest
 
-**Recommended**: Simple manifest logged at session start
+**Recommended**: Manifest logged at session start
 
 **File**: `artifacts/session_manifest_{timestamp}.json`
 
-**Content** (minimal):
+**Content**:
 ```python
 {
+    # Session info
+    'session_id': timestamp,
     'session_start': datetime.now().isoformat(),
-    'git_commit': get_git_sha(),                    # Full SHA
+    'git_commit': get_git_sha(),
     'git_branch': get_git_branch(),
+    'git_dirty': check_if_uncommitted_changes(),  # Warn if not clean
+
+    # Environment (useful for debugging)
     'environment': {
-        'python': sys.version.split()[0],
+        'hostname': socket.gethostname(),
+        'python': sys.version,
         'torch': torch.__version__,
         'transformers': transformers.__version__,
-        'cuda': torch.version.cuda if torch.cuda.is_available() else None
+        'cuda': torch.version.cuda if torch.cuda.is_available() else None,
+        'gpu': torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
+        'gpu_memory_gb': torch.cuda.get_device_properties(0).total_memory / 1e9 if torch.cuda.is_available() else None
     },
-    'artifacts': []  # Can append as generated, or just use for reference
+
+    # Expected work (for planning/tracking)
+    'planned_artifacts': [
+        'sft_training_data_*.jsonl (200 examples)',
+        'sft_model checkpoint',
+        'evaluation_comprehensive_*.json'
+    ],
+
+    # Can update as session progresses
+    'artifacts_generated': []
 }
 ```
 
 **Benefits**:
-- Quick environment check
-- Session-level git commit for reference
+- Environment snapshot for debugging
+- Track what was planned vs completed
+- Detect uncommitted changes (should warn!)
 
-**Note**: This is optional since every artifact has its own git_commit. Mainly useful for debugging environment issues.
+**Update as session progresses**:
+```python
+# When artifact created
+manifest['artifacts_generated'].append({
+    'file': artifact_path,
+    'type': 'training_data',
+    'timestamp': datetime.now().isoformat()
+})
+```
 
 ---
 
@@ -181,6 +260,8 @@ evaluation_report = {
 
 ```python
 import subprocess
+import socket
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -192,26 +273,76 @@ def get_git_branch():
     """Get current git branch"""
     return subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD']).decode().strip()
 
-def create_artifact_metadata(provenance=None, **extra):
-    """Create minimal standardized metadata for any artifact
+def check_git_dirty():
+    """Check if there are uncommitted changes"""
+    result = subprocess.run(['git', 'status', '--porcelain'], capture_output=True)
+    return len(result.stdout) > 0
+
+def create_artifact_metadata(provenance, script_name, artifact_type, **extra):
+    """Create standardized metadata for any artifact
 
     Args:
-        provenance: Optional provenance dict from CleanModelLoader.load()
-        **extra: Any additional metadata to include
+        provenance: Provenance dict from CleanModelLoader.load()
+        script_name: Name of the script generating this artifact
+        artifact_type: 'training_data', 'evaluation', 'model', etc.
+        **extra: Any additional metadata to include (params, dataset info, etc.)
 
     Returns:
-        Dict with git_commit, timestamp, and optional loader_version
+        Dict with comprehensive metadata
     """
     metadata = {
+        # Safety net
         'git_commit': get_git_sha(),
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now().isoformat(),
+
+        # Model provenance
+        'loader_version': provenance['loader_version'],
+        'model_name': provenance['model_name'],
+        'quantization': provenance['quantization'],
+        'template_disabled': provenance['template_disabled'],
+
+        # Context
+        'script_name': script_name,
+        'artifact_type': artifact_type
     }
 
-    if provenance:
-        metadata['loader_version'] = provenance['loader_version']
-
+    # Add any extra fields
     metadata.update(extra)
     return metadata
+
+def create_session_manifest(planned_artifacts=None):
+    """Create session-level manifest
+
+    Args:
+        planned_artifacts: Optional list of artifacts planned for this session
+
+    Returns:
+        Dict with session metadata
+    """
+    import torch
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    manifest = {
+        'session_id': timestamp,
+        'session_start': datetime.now().isoformat(),
+        'git_commit': get_git_sha(),
+        'git_branch': get_git_branch(),
+        'git_dirty': check_git_dirty(),
+        'environment': {
+            'hostname': socket.gethostname(),
+            'python': sys.version,
+            'torch': torch.__version__,
+            'transformers': None,  # Fill in if needed
+            'cuda': torch.version.cuda if torch.cuda.is_available() else None,
+            'gpu': torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
+            'gpu_memory_gb': torch.cuda.get_device_properties(0).total_memory / 1e9 if torch.cuda.is_available() else None
+        },
+        'planned_artifacts': planned_artifacts or [],
+        'artifacts_generated': []
+    }
+
+    return manifest, timestamp
 ```
 
 **Usage**:
@@ -219,15 +350,34 @@ def create_artifact_metadata(provenance=None, **extra):
 # In data generation
 example['metadata'] = create_artifact_metadata(
     provenance=self.provenance,
-    artifact_type='training_data'
+    script_name=Path(__file__).name,
+    artifact_type='training_data',
+    seed=self.seed,
+    temperature=0.7,
+    max_new_tokens=150
 )
 
 # In evaluation
 report['metadata'] = create_artifact_metadata(
     provenance=provenance,
-    dataset_name='held_out_test',
-    dataset_size=len(test_examples)
+    script_name=Path(__file__).name,
+    artifact_type='evaluation',
+    models={'base': 'Qwen/Qwen2.5-32B', 'sft': str(SFT_CHECKPOINT)},
+    dataset={'name': 'held_out_test', 'size': len(test_examples)},
+    temperature=0.7,
+    eval_seed=42
 )
+
+# At session start
+manifest, session_id = create_session_manifest(
+    planned_artifacts=[
+        'sft_training_data_*.jsonl (200 examples)',
+        'sft_model checkpoint',
+        'evaluation_*.json'
+    ]
+)
+with open(f'artifacts/session_manifest_{session_id}.json', 'w') as f:
+    json.dump(manifest, f, indent=2)
 ```
 
 ---
@@ -271,17 +421,25 @@ git cat-file -t $(jq -r '.metadata.git_commit' artifacts/evaluation_*.json | hea
 
 ## Status
 
-- ✅ Design complete (simplified based on "git commit as source of truth" policy)
+- ✅ Design complete (git commit as safety net, capture what we'll query/filter by)
 - ⏳ Helper utility pending (`utils/provenance_helper.py`)
 - ⏳ Data generation metadata pending
 - ⏳ Evaluation report metadata pending
 
-**Key simplification**:
-- Always deploy from git → commit hash is sufficient provenance
-- Everything else can be looked up from the commit
-- Minimal metadata: `git_commit`, `timestamp`, `loader_version`
+**Key principles**:
+- Always deploy from git → commit hash as safety net
+- Capture anything we'll want to query/filter/compare without digging through git
+- Think: "What questions will I want to answer about this artifact?"
+
+**Comprehensive metadata**:
+- Git commit (safety net)
+- Model provenance (loader version, quantization, contamination status)
+- Generation/eval parameters (seed, temperature, etc.)
+- Dataset info (name, size, source)
+- Context (script name, artifact type)
 
 **Next steps**:
 1. Create `utils/provenance_helper.py`
-2. Update `generate_stage1_sft_data.py` to add metadata
-3. Update evaluation scripts to add metadata
+2. Update `generate_stage1_sft_data.py` to add comprehensive metadata
+3. Update evaluation scripts to add comprehensive metadata
+4. Add session manifest creation to RunPod workflow
