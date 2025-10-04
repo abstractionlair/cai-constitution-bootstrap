@@ -99,11 +99,34 @@ This separates the cognitive/planning work from the computational/execution work
 - GPU access (can run models)
 - Focused on execution, not design
 - Short-running sessions (minutes/hours per task)
-- Instructed explicitly: "You are on the pod to run experiments, not code"
+- **Critical instruction**: "You are on the pod to run experiments, not code. Wait for explicit instructions before executing anything - don't start work proactively."
 
 ---
 
 ## Communication Protocol
+
+### Pod Claude Initialization
+
+**First message to Pod Claude** (critical to set expectations):
+
+```
+You are on the pod to run experiments, not code.
+
+Your role:
+- Execute scripts and commands I provide
+- Monitor and report results
+- Report errors and issues
+
+Important: Wait for my explicit instructions before executing anything.
+Don't start work proactively or suggest next steps without being asked.
+
+Ready when you are.
+```
+
+This prevents Pod Claude from:
+- Proactively running scripts without being asked
+- Trying to write/modify code (that's Local Claude's job)
+- Making assumptions about what to do next
 
 ### Handoff Pattern
 
@@ -149,7 +172,7 @@ Local Claude analyzes ← User shares ← Pod Claude reports
 - ✅ SSH'd to pod: `ssh root@63.141.33.75 -p 22069 -i ~/.ssh/id_ed25519`
 - ✅ Pulled latest code: `cd /workspace/MaximalCAI && git pull`
 - ✅ Launched Claude Code on pod
-- ✅ Informed Pod Claude of its role: "You are on the pod to run experiments, not code"
+- ✅ Informed Pod Claude of its role: "You are on the pod to run experiments, not code. Wait for my explicit instructions before executing anything."
 
 ### Execution Phase
 
@@ -241,12 +264,13 @@ Please run the following sequence:
 - Pod Claude provides comprehensive reports
 - Use git for code, scp for artifacts
 
-### Challenge 3: Role Confusion
-**Issue**: Pod Claude might try to design/code instead of execute
+### Challenge 3: Role Confusion and Proactiveness
+**Issue**: Pod Claude might try to design/code instead of execute, or start work without being asked
 **Mitigation**:
-- Explicit instruction: "You are on the pod to run experiments, not code"
+- Explicit instruction: "You are on the pod to run experiments, not code. Wait for explicit instructions - don't start work proactively."
 - Task-focused instructions (not open-ended)
 - Local Claude handles all design/coding
+- User provides clear "do X" instructions, not "what should I do?"
 
 ### Challenge 4: Pod Environment Reliability
 **Issue**: First H100 pod had broken torch installation causing hangs
