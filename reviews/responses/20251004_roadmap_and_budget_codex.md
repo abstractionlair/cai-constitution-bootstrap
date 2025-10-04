@@ -4,6 +4,7 @@
 **Date**: 2025-10-04
 **Request**: Big-picture roadmap review and efficient frontier analysis
 **Budget Decision**: $300 approved
+**GPU Selection**: H100 SXM 80GB @ $2.69/hr
 
 ---
 
@@ -97,19 +98,53 @@ Codex provided compute/stats tradeoffs across budgets:
 
 ## $300 Budget Plan (Approved)
 
-### Compute Allocation (~165-175h)
+### GPU Selection: H100 SXM 80GB @ $2.69/hr
 
-- **Baseline eval**: 1-2h (N=800-1200, deterministic)
-- **SFT data gen**: 10-14h (15-20k examples)
-- **SFT train**: 12-18h (QLoRA, 3-5 epochs, early stop)
-- **Preference pairs**: 10-14h (BoN k=3-4, 20-30k pairs)
-- **DPO train**: 12-18h (β≈0.1-0.2, 2-3 epochs)
-- **Core evals**: 3-5h (base/SFT/DPO, N=1000)
-- **Ablation A (β)**: 11-16h (train + eval)
-- **Ablation B (BoN k)**: 16-24h (pairs + train + eval)
-- **Robustness buffer**: 25-35h (retries, OOMs)
+**Options Considered**:
 
-**Total**: ~160-175h @ $1.74/hr = ~$278-305
+| GPU | VRAM | $/hr | Hours @ $300 | Performance | Total Time Needed |
+|-----|------|------|--------------|-------------|-------------------|
+| A100 80GB | 80GB | $1.74 | 172h | 1.0x (baseline) | 165-175h |
+| **H100 80GB** | **80GB** | **$2.69** | **111h** | **~2x** | **82-87h** ✅ |
+| H200 141GB | 141GB | $3.79 | 79h | ~2.2x | 75-80h ⚠️ |
+| L40 48GB | 48GB | $1.07 | 280h | ~0.7x | 235-250h |
+| RTX A6000 | 48GB | $0.49 | 612h | ~0.5x | 330-350h |
+
+**Selected: H100 SXM 80GB @ $2.69/hr**
+
+**Rationale**:
+- H100 is ~2x faster than A100
+- 165-175 A100-equivalent hours → **82-87 H100 hours**
+- Budget: $300 / $2.69 = **111.5 hours available**
+- **Buffer**: 24-29 hours (~28% margin) for retries/OOMs
+- Sweet spot: faster than A100, more buffer than H200
+
+**Benefits**:
+- **Faster completion**: ~50% less wall-clock time than A100
+- **Good buffer**: 28% margin vs tight fit on H200
+- **Proven hardware**: 80GB comfortable for 32B model
+- **Total cost**: ~$222-234 (similar to A100 but finishes sooner)
+
+**vs A100**: Costs $0.95/hr more but finishes in half the time → similar total cost, less waiting
+**vs H200**: Slightly slower but 30% more buffer hours → more forgiving
+**vs L40/A6000**: Much faster wall-clock (days → hours) worth the price premium
+
+### Compute Allocation (~82-87h on H100)
+
+**Note**: Times adjusted for H100 (~2x faster than A100)
+
+- **Baseline eval**: 0.5-1h (N=800-1200, deterministic)
+- **SFT data gen**: 5-7h (15-20k examples)
+- **SFT train**: 6-9h (QLoRA, 3-5 epochs, early stop)
+- **Preference pairs**: 5-7h (BoN k=3-4, 20-30k pairs)
+- **DPO train**: 6-9h (β≈0.1-0.2, 2-3 epochs)
+- **Core evals**: 1.5-2.5h (base/SFT/DPO, N=1000)
+- **Ablation A (β)**: 5.5-8h (train + eval)
+- **Ablation B (BoN k)**: 8-12h (pairs + train + eval)
+- **Robustness buffer**: 12-17h (retries, OOMs)
+
+**Total**: ~80-87h @ $2.69/hr = **~$215-234**
+**Remaining**: ~$66-85 for additional buffer/experiments
 
 ### Execution Phases
 
@@ -119,26 +154,26 @@ Codex provided compute/stats tradeoffs across budgets:
 - ⏳ Enable provenance logging
 - ⏳ Define early-stop thresholds
 
-**Phase 1: Baseline** (~1-2h)
+**Phase 1: Baseline** (~0.5-1h on H100)
 - Run base eval (N=800-1200, temperature=0, greedy)
 - Stratified by instruction type
 - Save full JSON with metadata
 
-**Phase 2: SFT Data + Train** (~22-32h)
+**Phase 2: SFT Data + Train** (~11-16h on H100)
 - Generate 15-20k SFT examples with provenance
 - Train SFT (QLoRA, 3-5 epochs, early stop)
 - Intermediate eval
 
-**Phase 3: Preference Pairs + DPO** (~22-32h)
+**Phase 3: Preference Pairs + DPO** (~11-16h on H100)
 - Generate 20-30k pairs (BoN k=3-4, margin filter)
 - Train DPO (β≈0.1-0.2, 2-3 epochs, early stop)
 
-**Phase 4: Core Evaluations** (~3-5h)
+**Phase 4: Core Evaluations** (~1.5-2.5h on H100)
 - Evaluate base/SFT/DPO on identical N=1000 set (paired)
 - Deterministic decoding
 - Full metadata per result
 
-**Phase 5: Ablations** (~27-40h)
+**Phase 5: Ablations** (~13.5-20h on H100)
 - **A: β ablation** (0.3 vs 0.1-0.2, reuse pairs)
 - **B: BoN ablation** (k=2 vs 4 on 10-15k subset)
 - Optional: seed robustness check
@@ -249,29 +284,30 @@ Codex provided compute/stats tradeoffs across budgets:
 
 ---
 
-## Proposed Session Strategy
+## Proposed Session Strategy (H100 @ $2.69/hr)
 
-Codex suggests 3 GPU sessions:
+Three GPU sessions with H100 times:
 
-**Session 1** (~40-55h, ~$70-96):
+**Session 1** (~20-27h H100, ~$54-73):
 - Baseline eval
 - SFT data gen (~10-12k)
 - SFT train (3-4 epochs)
 - Interim eval
 
-**Session 2** (~55-70h, ~$96-122):
+**Session 2** (~27-35h H100, ~$73-94):
 - Complete SFT data (~5-8k more)
 - Preference pairs (20-30k)
 - DPO train
 - Core eval (N=1000)
 
-**Session 3** (~55-65h, ~$96-113):
+**Session 3** (~27-33h H100, ~$73-89):
 - Ablation A (β)
 - Ablation B (BoN k)
 - Final evals
 - Analysis and reports
 
-**Total**: ~150-190h, ~$262-332
+**Total**: ~74-95h H100 @ $2.69/hr = **~$199-256**
+**Buffer remaining**: ~$44-101 for retries/experiments
 
 ---
 
