@@ -212,12 +212,13 @@ def generate_sample_dataset(count: int = 50, seed: int = 42):
             )
 
             # Generate response
+            # Note: Reproducibility via inst_seed handled by setting torch/numpy random state,
+            # not per-generation seed parameter (CleanModelLoader.generate doesn't accept seed)
             response = loader.generate(
                 model, tokenizer, prompt,
                 max_new_tokens=150,
                 temperature=0.7,
-                do_sample=True,
-                seed=inst_seed
+                do_sample=True
             )
 
             # Clean up response (remove trailing whitespace, extra newlines)

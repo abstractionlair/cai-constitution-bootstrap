@@ -256,12 +256,13 @@ def generate_dataset_slice(
             )
 
             # Generate response
+            # Note: Reproducibility via inst_seed handled by setting torch/numpy random state,
+            # not per-generation seed parameter (CleanModelLoader.generate doesn't accept seed)
             response = loader.generate(
                 model, tokenizer, prompt,
                 max_new_tokens=150,
                 temperature=0.7,
-                do_sample=True,
-                seed=inst_seed
+                do_sample=True
             )
 
             # Clean up response
