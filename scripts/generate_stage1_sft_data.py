@@ -15,7 +15,6 @@ from datetime import datetime
 import sys
 import os
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -26,6 +25,9 @@ BASE_DIR = Path(os.getenv('CAI_BASE_DIR', '/workspace/runs/stage1_20250911_13110
 ARTIFACTS_DIR = BASE_DIR / "artifacts"
 CHECKPOINTS_DIR = BASE_DIR / "checkpoints"
 sys.path.insert(0, str(BASE_DIR / 'scripts'))
+
+# Import clean model loader
+from utils.clean_model_loader import CleanModelLoader
 
 # Create directories
 ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -40,8 +42,9 @@ class SFTDataGenerator:
         logger.info(f"🎲 Initialized SFT data generator with seed {seed}")
         
         # Model components
-        self.model: Optional[AutoModelForCausalLM] = None
-        self.tokenizer: Optional[AutoTokenizer] = None
+        self.model = None
+        self.tokenizer = None
+        self.loader: Optional[CleanModelLoader] = None
         self.min_response_length = min_response_length
         
         # Instruction templates (needed even without model)
@@ -107,45 +110,18 @@ class SFTDataGenerator:
                 self.tokenizer = None
         
     def load_base_model(self):
-        """Load base Qwen model for generating initial responses"""
+        """Load base Qwen model for generating initial responses (using CleanModelLoader)"""
         logger.info("🤖 Loading Qwen-2.5-32B base model for data generation...")
-        
-        model_name = "Qwen/Qwen2.5-32B"
-        
-        # Configure quantization for memory efficiency
-        quantization_config = BitsAndBytesConfig(
+
+        # Use CleanModelLoader for guaranteed contamination-free loading
+        self.loader = CleanModelLoader(
+            model_name="Qwen/Qwen2.5-32B",
             load_in_8bit=True,
-            llm_int8_threshold=6.0,
-            llm_int8_skip_modules=None,
+            load_in_4bit=False
         )
-        
-        # Load tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            model_name,
-            trust_remote_code=True,
-            use_fast=True
-        )
-        
-        # Disable chat template to ensure pure base model behavior
-        self.tokenizer.chat_template = None
-        
-        # Add pad token if missing
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
-            
-        # Load model with quantization
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            quantization_config=quantization_config,
-            device_map="auto",
-            trust_remote_code=True,
-            dtype=torch.bfloat16,
-            attn_implementation="flash_attention_2" if torch.cuda.is_available() else "eager"
-        )
-        
-        # Set to eval mode
-        self.model.eval()
-        logger.info("✅ Base model loaded successfully for data generation")
+
+        self.model, self.tokenizer = self.loader.load()
+        logger.info("✅ Base model loaded with CleanModelLoader (contamination-free)")
     
     def generate_instruction(self, inst_type: str, inst_id: str) -> Dict[str, Any]:
         """Generate a single instruction of given type"""
@@ -262,41 +238,23 @@ class SFTDataGenerator:
         return self._generate_placeholder_response(instruction, inst_type)
     
     def _generate_with_model(self, instruction: str, inst_type: str) -> str:
-        """Generate response using the loaded base model"""
-        
+        """Generate response using the loaded base model (via CleanModelLoader)"""
+
         # Create completion-style prompt
         completion_prompt = self.create_completion_prompt(instruction, inst_type)
-        
-        # Tokenize input without special tokens to prevent template contamination
-        inputs = self.tokenizer(
+
+        # Use CleanModelLoader's generate method (handles all contamination prevention)
+        generated_text = self.loader.generate(
+            self.model,
+            self.tokenizer,
             completion_prompt,
-            add_special_tokens=False,
-            return_tensors="pt",
-            max_length=512,
-            truncation=True,
-            padding=False
-        ).to(self.model.device)
-        
-        # Generate response
-        with torch.no_grad():
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=150,
-                temperature=0.7,
-                do_sample=True,
-                top_p=0.9,
-                repetition_penalty=1.1,
-                pad_token_id=self.tokenizer.eos_token_id,
-                eos_token_id=self.tokenizer.eos_token_id
-            )
-        
-        # Decode response (remove input prompt)
-        input_length = inputs['input_ids'].shape[1]
-        generated_text = self.tokenizer.decode(
-            outputs[0][input_length:], 
-            skip_special_tokens=True
+            max_new_tokens=150,
+            temperature=0.7,
+            top_p=0.9,
+            repetition_penalty=1.1,
+            do_sample=True
         )
-        
+
         # Clean and validate the response
         return self._clean_response(generated_text, inst_type)
     

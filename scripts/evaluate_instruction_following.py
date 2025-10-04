@@ -18,12 +18,16 @@ Expected Performance:
 import json
 import torch
 import logging
+import sys
 from pathlib import Path
 from typing import Dict, List, Any, Tuple
 from datetime import datetime
 from dataclasses import dataclass, asdict
-from transformers import AutoTokenizer, AutoModelForCausalLM
 import re
+
+# Add utils to path
+sys.path.insert(0, str(Path(__file__).parent))
+from utils.clean_model_loader import CleanModelLoader
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -64,6 +68,7 @@ class InstructionFollowingEvaluator:
         # Will be loaded on demand
         self.model = None
         self.tokenizer = None
+        self.loader = None  # CleanModelLoader instance
 
         # Test suite
         self.test_examples = self._create_test_suite()
@@ -180,69 +185,35 @@ class InstructionFollowingEvaluator:
         return examples
 
     def load_model(self):
-        """Load model and tokenizer with clean settings"""
+        """Load model and tokenizer with clean settings (using CleanModelLoader)"""
         logger.info(f"📦 Loading model: {self.model_path}")
 
-        # Load tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            self.model_path,
-            trust_remote_code=True,
-            use_fast=True
-        )
-
-        # CRITICAL: Disable chat template to prevent contamination
-        self.tokenizer.chat_template = None
-        if hasattr(self.tokenizer, 'default_chat_template'):
-            self.tokenizer.default_chat_template = None
-
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
-
-        # Load model (8-bit for efficiency)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_path,
+        # Use CleanModelLoader for guaranteed contamination-free loading
+        self.loader = CleanModelLoader(
+            model_name=self.model_path,
             load_in_8bit=True,
-            device_map="auto",
-            trust_remote_code=True,
-            torch_dtype=torch.bfloat16
+            load_in_4bit=False
         )
 
-        self.model.eval()
-        logger.info("✅ Model loaded successfully")
+        self.model, self.tokenizer = self.loader.load()
+        logger.info("✅ Model loaded with CleanModelLoader (contamination-free)")
 
     def generate_response(self, instruction: str, max_tokens: int = 100) -> Tuple[str, int]:
-        """Generate response to instruction
-
-        Uses direct tokenization without special tokens to avoid contamination.
-        """
-        # Tokenize WITHOUT add_special_tokens to prevent template application
-        inputs = self.tokenizer(
+        """Generate response to instruction (using CleanModelLoader)"""
+        # Use CleanModelLoader's generate method (handles all contamination prevention)
+        response = self.loader.generate(
+            self.model,
+            self.tokenizer,
             instruction,
-            add_special_tokens=False,
-            return_tensors="pt",
-            max_length=512,
-            truncation=True,
-            padding=False
-        ).to(self.model.device)
+            max_new_tokens=max_tokens,
+            temperature=0.7,
+            top_p=0.9,
+            repetition_penalty=1.1,
+            do_sample=True
+        )
 
-        # Generate
-        with torch.no_grad():
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=max_tokens,
-                temperature=0.7,
-                do_sample=True,
-                top_p=0.9,
-                repetition_penalty=1.1,
-                eos_token_id=self.tokenizer.eos_token_id,
-                pad_token_id=self.tokenizer.eos_token_id
-            )
-
-        # Decode only the new tokens
-        input_length = inputs['input_ids'].shape[1]
-        generated_tokens = outputs[0][input_length:]
-        response = self.tokenizer.decode(generated_tokens, skip_special_tokens=True).strip()
-        tokens_generated = len(generated_tokens)
+        # Count tokens for metrics (approximate from response)
+        tokens_generated = len(self.tokenizer.encode(response, add_special_tokens=False))
 
         return response, tokens_generated
 
