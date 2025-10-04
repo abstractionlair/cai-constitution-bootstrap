@@ -69,15 +69,84 @@
 **Generated**: 200 high-quality examples (artifacts/sft_training_data_20250913_005116.jsonl)
 **Dependencies**: `utils/data_formatter.CompletionStylePrompts`
 
-### `stage1_generate.py`
-**Purpose**: Generate responses using base model
+### `evaluate_instruction_following.py` ⭐ PRIMARY EVALUATION SCRIPT
+**Purpose**: Self-contained instruction-following evaluation
+**Lines**: ~600 lines
 **Key Features**:
-- ✅ CORRECTLY uses `CompletionStylePrompts.create_response_generation_prompt()` (line 196)
-- Few-shot completion approach
-- Clean base model handling
+- ✅ Chat template disabled (line 141: `tokenizer.chat_template = None`)
+- ✅ add_special_tokens=False (line 220)
+- ✅ Comprehensive test suite (12 instruction types)
+- ✅ Clear success criteria per example
+- ✅ Reproducible (EVAL_SEED = 42)
+- Expected performance: Base ~10-30%, SFT ~70-80%, SFT+DPO ~90-95%
 
-**Status**: ✅ Complete and correct
-**Use As**: Reference implementation for completion-style prompting
+**Test Coverage**:
+- Explicit commands (lists, sentences, translation)
+- Q&A format (math, factual)
+- Completion tasks
+- Format constraints (word count, numbered lists, yes/no)
+- Multi-step instructions
+- Harmful request refusal
+
+**Status**: ✅ Ready to use
+**Created**: 2025-10-03
+**Location**: `scripts/evaluate_instruction_following.py`
+
+### `test_base_model_ultra_clean.py` ⭐ VERIFICATION SCRIPT
+**Purpose**: Verify no chat template contamination in base model
+**Key Features**:
+- ✅ Chat template disabled (line 49: `tokenizer.chat_template = None`)
+- ✅ add_special_tokens=False (line 128)
+- ✅ Sentinel tests from BASE_MODEL_TRUTH.md
+- Tests: translation, lists, JSON, descriptions
+- Base model SHOULD FAIL most tests (proves no contamination)
+
+**Status**: ✅ Ready to use (NOT YET RUN - needs GPU)
+**Created**: 2025-09-12
+**Location**: `scripts/test_base_model_ultra_clean.py`
+
+### `train_stage1_dpo_improved.py` ⭐ PRIMARY DPO TRAINER
+**Purpose**: DPO training for Stage 1
+**Status**: ✅ Current
+**Location**: `scripts/train_stage1_dpo_improved.py`
+**Note**: Full documentation needed (check script for details)
+
+### `create_preference_pairs_improved.py` ⭐ PRIMARY PREFERENCE PAIR GENERATOR
+**Purpose**: Generate preference pairs for DPO training
+**Status**: ✅ Current
+**Location**: `scripts/create_preference_pairs_improved.py`
+**Note**: Full documentation needed (check script for details)
+
+---
+
+## Deprecated Scripts
+
+### `stage1_generate.py` ❌ DEPRECATED
+**Purpose**: Generate responses using base model
+**Deprecated**: 2025-10-03
+**Reason**: ❌ Chat template contamination - does NOT disable `tokenizer.chat_template`
+**Location**: `scripts/archived/2025_10_03_chat_template_contaminated/`
+**Use Instead**: `generate_stage1_sft_data.py`
+
+**Note**: While it uses CompletionStylePrompts (line 196), it fails to disable chat_template (line 165), causing contamination.
+
+### `stage1_generate_robust.py` ❌ DEPRECATED
+**Purpose**: Robust generation with retry logic
+**Deprecated**: 2025-10-03
+**Reason**: ❌ Chat template contamination + superseded by more complete script
+**Location**: `scripts/archived/2025_10_03_chat_template_contaminated/`
+**Use Instead**: `generate_stage1_sft_data.py`
+
+### `generate_stage1_data.py` ❌ DEPRECATED
+**Purpose**: Complete Stage 1 data pipeline
+**Deprecated**: 2025-10-03
+**Reason**: ❌ Uses `model_loader.load_base_model` which doesn't disable chat_template
+**Location**: `scripts/archived/2025_10_03_chat_template_contaminated/`
+**Use Instead**: `generate_stage1_sft_data.py`
+
+**Note**: Likely generated the Sep 10, 2025 data in `data/stage1/train_instructions.jsonl`.
+
+---
 
 ### `generate_test_instructions.py`
 **Purpose**: Generate held-out test instructions
