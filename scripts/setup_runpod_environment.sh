@@ -93,6 +93,11 @@ pip install -q \
     tqdm>=4.66.0
 
 echo ""
+echo "Installing Flash Attention (this may take a few minutes)..."
+echo "Note: Building from source, may show compilation warnings"
+pip install flash-attn --no-build-isolation
+
+echo ""
 echo "✅ Python dependencies installed"
 echo ""
 

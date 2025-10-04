@@ -49,6 +49,10 @@ datasets>=2.14.0
 # Utilities
 tqdm>=4.66.0
 
+# Flash Attention (for efficient attention computation)
+# Note: Requires compilation, use: pip install flash-attn --no-build-isolation
+flash-attn>=2.3.0
+
 # Optional: for statistical analysis
 statsmodels>=0.14.0  # For verification of stats functions
 ```
