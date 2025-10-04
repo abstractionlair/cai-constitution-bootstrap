@@ -97,9 +97,12 @@ mkdir -p artifacts checkpoints data logs
 ### 3. Environment Setup (~10-15 min)
 
 ```bash
-# Install dependencies
+# Install dependencies from requirements.txt
 pip install --upgrade pip
-pip install torch transformers accelerate bitsandbytes peft datasets scipy numpy
+pip install -r requirements.txt
+
+# Install Flash Attention (requires compilation)
+pip install flash-attn --no-build-isolation
 
 # Verify installation
 python3 -c "import torch, transformers, bitsandbytes; print('All imports OK')"

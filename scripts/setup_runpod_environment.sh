@@ -61,36 +61,45 @@ echo ""
 echo "Upgrading pip..."
 pip install --upgrade pip -q
 
-echo ""
-echo "Installing ML frameworks (this may take a few minutes)..."
-pip install -q \
-    torch>=2.1.0 \
-    transformers>=4.35.0 \
-    accelerate>=0.24.0
+# Check if we're in the MaximalCAI directory for requirements.txt
+if [ -f "/workspace/MaximalCAI/requirements.txt" ]; then
+    echo ""
+    echo "Installing dependencies from requirements.txt..."
+    cd /workspace/MaximalCAI
+    pip install -q -r requirements.txt
+else
+    echo ""
+    echo "requirements.txt not found, installing dependencies individually..."
+    echo "Installing ML frameworks (this may take a few minutes)..."
+    pip install -q \
+        torch>=2.1.0 \
+        transformers>=4.35.0 \
+        accelerate>=0.24.0
 
-echo ""
-echo "Installing quantization and training libraries..."
-pip install -q \
-    bitsandbytes>=0.41.0 \
-    peft>=0.6.0
+    echo ""
+    echo "Installing quantization and training libraries..."
+    pip install -q \
+        bitsandbytes>=0.41.0 \
+        peft>=0.6.0
 
-echo ""
-echo "Installing HuggingFace utilities..."
-pip install -q \
-    hf-transfer>=0.1.0 \
-    datasets>=2.14.0
+    echo ""
+    echo "Installing HuggingFace utilities..."
+    pip install -q \
+        hf-transfer>=0.1.0 \
+        datasets>=2.14.0
 
-echo ""
-echo "Installing scientific computing libraries..."
-pip install -q \
-    numpy>=1.24.0 \
-    scipy>=1.11.0 \
-    statsmodels>=0.14.0
+    echo ""
+    echo "Installing scientific computing libraries..."
+    pip install -q \
+        numpy>=1.24.0 \
+        scipy>=1.11.0 \
+        statsmodels>=0.14.0
 
-echo ""
-echo "Installing utilities..."
-pip install -q \
-    tqdm>=4.66.0
+    echo ""
+    echo "Installing utilities..."
+    pip install -q \
+        tqdm>=4.66.0
+fi
 
 echo ""
 echo "Installing Flash Attention (this may take a few minutes)..."

@@ -37,6 +37,88 @@
 
 ## Core Utilities (`scripts/utils/`)
 
+### `provenance_helper.py` ⭐ PROVENANCE AND METADATA TRACKING
+**Purpose**: Capture and persist provenance information in all generated artifacts
+**Key Features**:
+- `get_git_sha()` - Get current git commit SHA (full or short)
+- `get_git_branch()` - Get current branch name
+- `check_git_dirty()` - Check for uncommitted changes
+- `create_artifact_metadata()` - Standardized metadata for any artifact (training data, eval, etc.)
+- `create_session_manifest()` - Session-level manifest with environment snapshot
+
+**Design Philosophy**:
+- Git commit is "safety net" - can look up any details if needed
+- But capture commonly-queried fields (model, params, seeds) for easy filtering
+- Warn if git is dirty (uncommitted changes) - production should use clean commits
+
+**Metadata Fields**:
+```python
+{
+    'git_commit': str,  # Full SHA (40 chars)
+    'timestamp': str,  # ISO-8601
+    'loader_version': str,  # CleanModelLoader git SHA
+    'model_name': str,  # HuggingFace model name
+    'quantization': str,  # '4bit', '8bit', etc.
+    'template_disabled': bool,  # Chat template disabled?
+    'script_name': str,  # Script that generated this
+    'artifact_type': str,  # 'training_data', 'evaluation', etc.
+    ... # Plus any extra fields (seed, temperature, models, dataset)
+}
+```
+
+**Use When**:
+- Generating training data (add metadata to each JSONL record)
+- Running evaluations (add metadata to output JSON)
+- Creating checkpoints (record provenance)
+- Starting GPU session (create session manifest)
+
+**Status**: ✅ Complete and tested
+**Location**: `scripts/utils/provenance_helper.py`
+**Tests**: Manual testing (torch dependency prevents local unit tests)
+**Dependencies**: subprocess, socket, sys (stdlib only)
+**Added**: 2025-10-04 (P0 task)
+
+**Related Script**: `scripts/create_session_manifest.py` - Run at session start
+
+### `eval_statistics.py` ⭐ PUBLICATION-QUALITY STATISTICAL ANALYSIS
+**Purpose**: Statistical functions for paired binary outcome evaluation (base vs SFT vs DPO)
+**Key Features**:
+- `mcnemar_test()` - McNemar test for paired binary outcomes with continuity correction
+- `benjamini_hochberg()` - Multiple testing correction (FDR control)
+- `cohens_h()` - Effect size for proportion differences
+- `wilson_ci()` - Confidence intervals for proportions (better than normal approximation)
+- `bootstrap_ci()` - Bootstrap CIs for arbitrary statistics
+- `paired_comparison_analysis()` - Complete analysis pipeline (tests + corrections + effect sizes + CIs)
+- `format_comparison_results()` - Pretty-print results for debugging
+
+**Statistical Guarantees**:
+- McNemar: Exact test for paired data (continuity correction)
+- Benjamini-Hochberg: FDR ≤ α (typically α=0.10)
+- Wilson CI: Better coverage than normal approximation
+- Bootstrap: Percentile method, reproducible with seed
+
+**Output Structure**:
+```python
+{
+    'overall': {n, model1_rate, model1_ci, model2_rate, model2_ci,
+                lift, lift_ci_bootstrap, mcnemar_chi2, mcnemar_p, cohens_h},
+    'by_type': {<type>: {..., mcnemar_p_adjusted, significant_after_bh}},
+    'bh_correction': {fdr, n_tests, n_significant_adjusted},
+    'metadata': {labels, confidence_level, bootstrap_samples, random_seed}
+}
+```
+
+**Use When**:
+- Evaluating significance of base→SFT or SFT→DPO improvements
+- Need publication-quality statistics (N≥1000, paired design, stratified by type)
+- Must report p-values, effect sizes, CIs for publication
+
+**Status**: ✅ Complete and tested (30 unit tests pass)
+**Location**: `scripts/utils/eval_statistics.py`
+**Tests**: `tests/test_eval_statistics.py`
+**Dependencies**: numpy, scipy
+**Added**: 2025-10-04 (P0 task)
+
 ### `data_formatter.py`
 **Purpose**: Data formatting and prompt construction
 **Key Components**:
@@ -446,12 +528,64 @@
 
 **Status**: ✅ Complete
 
+### `create_session_manifest.py` ⭐ SESSION PROVENANCE
+**Purpose**: Create session-level manifest at start of GPU session
+**Key Features**:
+- Records session ID, timestamp, git commit/branch/dirty state
+- Captures environment snapshot (Python, PyTorch, CUDA, GPU)
+- Lists planned artifacts for session
+- Placeholder for artifacts_generated (updated by scripts)
+
+**When to Run**: At start of each production session on GPU pod
+
+**Output**: `artifacts/session_manifest_YYYYMMDD_HHMMSS.json`
+
+**Example**:
+```bash
+# On GPU pod, at session start
+cd /workspace/MaximalCAI
+python3 scripts/create_session_manifest.py
+```
+
+**Status**: ✅ Complete
+**Location**: `scripts/create_session_manifest.py`
+**Dependencies**: `utils/provenance_helper.py`, torch, transformers
+**Added**: 2025-10-04 (P0 task)
+
 ### Shell Scripts
 - `copy_to_pod.sh` - File transfer helper (uses SSH pipes, not scp)
 - `deploy_via_git.sh` - Git-based deployment
 - `scripts/sync_claude.sh` - Sync script (purpose TBD)
 
 **Status**: ✅ Complete
+
+### Dependency Management
+
+**`requirements.txt`** ⭐ PRODUCTION DEPENDENCIES
+- Core ML frameworks (torch, transformers, accelerate)
+- Quantization libraries (bitsandbytes, peft)
+- HuggingFace utilities (hf-transfer, datasets)
+- Scientific computing (numpy, scipy, statsmodels)
+- Note: flash-attn requires separate installation with `--no-build-isolation`
+
+**`requirements-dev.txt`** - DEVELOPMENT DEPENDENCIES
+- Includes all production requirements via `-r requirements.txt`
+- Testing (pytest, pytest-cov)
+- Code quality (black, flake8, isort, mypy)
+- Documentation (sphinx)
+
+**Usage**:
+```bash
+# Production
+pip install -r requirements.txt
+pip install flash-attn --no-build-isolation
+
+# Development
+pip install -r requirements-dev.txt
+```
+
+**Status**: ✅ Complete
+**Added**: 2025-10-04 (P2 task)
 
 ---
 

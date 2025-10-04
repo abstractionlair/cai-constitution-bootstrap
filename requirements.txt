@@ -1,0 +1,36 @@
+# Requirements for Constitutional AI Bootstrap
+# Stage 1: Explicit Instruction Following Training
+#
+# Installation:
+#   pip install -r requirements.txt
+#
+# Note: flash-attn requires compilation and should be installed separately:
+#   pip install flash-attn --no-build-isolation
+
+# Core ML frameworks
+torch>=2.1.0
+transformers>=4.35.0
+accelerate>=0.24.0
+
+# Quantization and efficient training
+bitsandbytes>=0.41.0
+peft>=0.6.0
+
+# HuggingFace utilities
+hf-transfer>=0.1.0  # Fast downloads from HF Hub
+datasets>=2.14.0
+
+# Scientific computing
+numpy>=1.24.0
+scipy>=1.11.0
+
+# Utilities
+tqdm>=4.66.0
+
+# Statistical analysis (for evaluation)
+statsmodels>=0.14.0  # Optional, for verification of eval_statistics.py
+
+# Flash Attention (efficient attention computation)
+# Note: This requires compilation from source
+# Uncomment if your environment supports compilation:
+# flash-attn>=2.3.0

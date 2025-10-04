@@ -1,0 +1,25 @@
+# Development requirements for Constitutional AI Bootstrap
+#
+# Installation:
+#   pip install -r requirements-dev.txt
+#
+# This includes all base requirements plus development tools
+
+# Include base requirements
+-r requirements.txt
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# Code quality
+black>=23.0.0
+flake8>=6.1.0
+isort>=5.12.0
+
+# Type checking
+mypy>=1.0.0
+
+# Documentation (if we add docs later)
+sphinx>=7.2.0
+sphinx-rtd-theme>=1.3.0
