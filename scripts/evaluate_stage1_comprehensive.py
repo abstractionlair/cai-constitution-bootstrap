@@ -98,8 +98,7 @@ class ComprehensiveEvaluator:
             prompt,
             max_new_tokens=max_length,
             temperature=0.7,
-            do_sample=True,
-            stop_strings=["END", "\n\n", "Instruction:"]
+            do_sample=True
         )
 
         response = response.strip()
