@@ -36,6 +36,9 @@ accelerate>=0.24.0
 bitsandbytes>=0.41.0
 peft>=0.6.0
 
+# HuggingFace utilities
+hf-transfer>=0.1.0  # Fast downloads from HF Hub
+
 # Scientific computing
 numpy>=1.24.0
 scipy>=1.11.0
