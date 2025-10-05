@@ -221,6 +221,24 @@ else
     echo "✅ Claude config already exists: $CLAUDE_CONFIG/config.json"
 fi
 
+# Prompt for Claude Code API key (for pod usage)
+echo ""
+echo "Claude Code API Key (for pod - uses chat subscription, not API):"
+echo "Note: If using chat subscription, leave blank. API key only needed if using API plan."
+read -sp "  Enter API key (or press enter to skip): " CLAUDE_API_KEY
+echo ""
+
+if [ -n "$CLAUDE_API_KEY" ]; then
+    # Store in .claude directory on network volume
+    mkdir -p "$CLAUDE_CONFIG"
+    echo "$CLAUDE_API_KEY" > "$CLAUDE_CONFIG/api_key"
+    chmod 600 "$CLAUDE_CONFIG/api_key"
+    echo "✅ Claude API key saved: $CLAUDE_CONFIG/api_key"
+    echo "   (Will be symlinked to ~/.claude/api_key on activation)"
+else
+    echo "⏭️  Skipped Claude API key (using chat subscription)"
+fi
+
 # ============================================================================
 # 7. Create Activation Script
 # ============================================================================
