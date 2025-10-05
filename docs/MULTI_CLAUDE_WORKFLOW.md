@@ -107,6 +107,28 @@ This separates the cognitive/planning work from the computational/execution work
 
 ### Pod Claude Initialization
 
+**IMPORTANT**: Set up network volume FIRST (see `/docs/NETWORK_VOLUME_SETUP.md`)
+
+**One-time setup on first pod**:
+```bash
+# Create 100GB network volume in RunPod dashboard
+# Launch pod with volume attached (name: maximalcai-experiment)
+
+cd /workspace/maximalcai-experiment
+curl -O https://raw.githubusercontent.com/abstractionlair/cai-constitution-bootstrap/main/scripts/setup_network_volume.sh
+chmod +x setup_network_volume.sh
+./setup_network_volume.sh
+
+# Follow prompts to configure credentials
+source activate_pod.sh
+```
+
+**Every new pod** (after termination):
+```bash
+cd /workspace/maximalcai-experiment
+source activate_pod.sh  # 30 seconds, everything persists!
+```
+
 **First message to Pod Claude** (critical to set expectations):
 
 ```

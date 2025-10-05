@@ -73,7 +73,7 @@ Before ANY base model evaluation:
 
 ### The Issue
 **Discovered**: 2025-10-05 (RunPod session)
-**Status**: ✅ WORKAROUND AVAILABLE
+**Status**: ✅ SOLVED - Use network volume (recommended) or /tmp workaround
 **Symptom**: File writes to `/workspace` fail with "CAS service error" or quota exceeded
 **Root Cause**: `/workspace` uses MooseFS with Xet CAS integration that has write quotas
 
@@ -83,37 +83,78 @@ Before ANY base model evaluation:
 - Any file writes to `/workspace` paths
 - Output artifact saves
 
-### The Workaround
+### Solution 1: Network Volume (RECOMMENDED)
+
+**Create persistent network volume** (~$10-20 for entire experiment):
+
+```bash
+# One-time setup (5-10 minutes)
+cd /workspace/maximalcai-experiment
+curl -O https://raw.githubusercontent.com/abstractionlair/cai-constitution-bootstrap/main/scripts/setup_network_volume.sh
+chmod +x setup_network_volume.sh
+./setup_network_volume.sh
+
+# Every new pod (30 seconds)
+cd /workspace/maximalcai-experiment
+source activate_pod.sh
+
+# Work normally - no quotas!
+python3 scripts/generate_sample_data.py --count 100
+```
+
+**Benefits**:
+- ✅ Standard filesystem (no write quotas)
+- ✅ Persists across pod terminations
+- ✅ All packages/credentials/config persist
+- ✅ New pods activate in 30 seconds
+- ✅ 100GB capacity (vs 20-30GB /tmp)
+- ✅ Zero risk of data loss
+
+**See**: `/docs/NETWORK_VOLUME_SETUP.md` for complete guide
+
+### Solution 2: /tmp Workaround (TEMPORARY)
+
 **Work from `/tmp` instead of `/workspace`**:
 
 ```bash
-# Clone to /tmp (uses local overlay filesystem, 30GB free)
+# Clone to /tmp (uses local overlay filesystem, 20-30GB)
 cd /tmp
 git clone https://github.com/abstractionlair/cai-constitution-bootstrap.git MaximalCAI_tmp
 cd MaximalCAI_tmp
 
-# Model cache at /workspace is READ-ONLY accessible (perfect!)
+# Model cache at /workspace is READ-ONLY accessible
 export MODEL_PATH=/workspace/huggingface_cache/hub/models--Qwen--Qwen2.5-32B/snapshots/<SHA>
 
 # Run scripts - they write to /tmp, read model from /workspace
 python3 scripts/generate_sample_data.py --count 100
+
+# CRITICAL: Download results before stopping pod!
+# Files in /tmp are lost when pod stops/terminates
 ```
 
-### Why This Works
+**Why This Works**:
 - `/tmp` uses local filesystem (no Xet quotas)
 - Model cache at `/workspace/huggingface_cache/` is readable (no writes needed)
 - Scripts use `MODEL_PATH` to load from `/workspace` (read-only)
 - Output artifacts write to `/tmp` (no quotas)
 
+**Limitations**:
+- ⚠️ Files lost when pod stops/terminates
+- ⚠️ Limited capacity (20-30GB)
+- ⚠️ Must reinstall packages on each pod
+- ⚠️ Must reconfigure credentials on each pod
+
 ### Code Support
 - ✅ `CleanModelLoader` accepts local paths (commit a21ba73)
 - ✅ Generation scripts check `MODEL_PATH` env var (commit a21ba73)
 - ✅ No hardcoded paths - flexible via environment variable
+- ✅ `setup_network_volume.sh` for persistent environment (2025-10-05)
 
 ### Status
-- ✅ Workaround validated with 100-sample generation
+- ✅ Network volume solution implemented and documented
+- ✅ /tmp workaround validated with 100-sample generation
 - ✅ QC metrics passed (100% delimiter, 0% contamination)
-- ✅ Ready for full-scale generation from `/tmp`
+- ✅ Ready for full-scale generation with either solution
 
 ---
 
