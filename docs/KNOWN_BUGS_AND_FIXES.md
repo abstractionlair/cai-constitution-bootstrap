@@ -69,13 +69,61 @@ Before ANY base model evaluation:
 
 ---
 
+## 🚨 CRITICAL: RunPod Xet/MooseFS Write Quota Issues
+
+### The Issue
+**Discovered**: 2025-10-05 (RunPod session)
+**Status**: ✅ WORKAROUND AVAILABLE
+**Symptom**: File writes to `/workspace` fail with "CAS service error" or quota exceeded
+**Root Cause**: `/workspace` uses MooseFS with Xet CAS integration that has write quotas
+
+### What Gets Blocked
+- HuggingFace cache writes (model downloads, lock files)
+- Git index writes (`git add`, `git commit`)
+- Any file writes to `/workspace` paths
+- Output artifact saves
+
+### The Workaround
+**Work from `/tmp` instead of `/workspace`**:
+
+```bash
+# Clone to /tmp (uses local overlay filesystem, 30GB free)
+cd /tmp
+git clone https://github.com/abstractionlair/cai-constitution-bootstrap.git MaximalCAI_tmp
+cd MaximalCAI_tmp
+
+# Model cache at /workspace is READ-ONLY accessible (perfect!)
+export MODEL_PATH=/workspace/huggingface_cache/hub/models--Qwen--Qwen2.5-32B/snapshots/<SHA>
+
+# Run scripts - they write to /tmp, read model from /workspace
+python3 scripts/generate_sample_data.py --count 100
+```
+
+### Why This Works
+- `/tmp` uses local filesystem (no Xet quotas)
+- Model cache at `/workspace/huggingface_cache/` is readable (no writes needed)
+- Scripts use `MODEL_PATH` to load from `/workspace` (read-only)
+- Output artifacts write to `/tmp` (no quotas)
+
+### Code Support
+- ✅ `CleanModelLoader` accepts local paths (commit a21ba73)
+- ✅ Generation scripts check `MODEL_PATH` env var (commit a21ba73)
+- ✅ No hardcoded paths - flexible via environment variable
+
+### Status
+- ✅ Workaround validated with 100-sample generation
+- ✅ QC metrics passed (100% delimiter, 0% contamination)
+- ✅ Ready for full-scale generation from `/tmp`
+
+---
+
 ## 🚨 CRITICAL: RunPod Environment - Torch Import Hangs
 
 ### The Bug
-**Discovered**: 2025-10-04 (RunPod H100 pod, pod ID lost)
-**Status**: ⚠️ ENVIRONMENT ISSUE - needs new pod with working torch
-**Symptom**: Scripts hang indefinitely when importing torch, SSH becomes unresponsive
-**Root Cause**: Pod environment had broken/misconfigured torch installation that:
+**Discovered**: 2025-10-04 (RunPod H100 pod, first session)
+**Status**: ⚠️ ENVIRONMENT ISSUE - was pod-specific, resolved by using new pod
+**Symptom**: Scripts hung indefinitely when importing torch, SSH became unresponsive
+**Root Cause**: That specific pod environment had broken/misconfigured torch installation that:
 - Exhausted file descriptors ("Too many open files in system")
 - Exhausted memory ("Cannot allocate memory")
 - Hung indefinitely trying to initialize CUDA
