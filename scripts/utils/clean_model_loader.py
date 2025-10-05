@@ -65,7 +65,10 @@ class CleanModelLoader:
         Initialize clean model loader.
 
         Args:
-            model_name: HuggingFace model name (default: Qwen/Qwen2.5-32B base)
+            model_name: HuggingFace model name OR local path to cached model
+                       Examples:
+                       - "Qwen/Qwen2.5-32B" (will download/use HF cache)
+                       - "/workspace/huggingface_cache/models--Qwen--Qwen2.5-32B/snapshots/abc123"
             load_in_4bit: Use 4-bit quantization (default: True, for training)
             load_in_8bit: Use 8-bit quantization (alternative to 4-bit)
             device_map: Device mapping strategy
@@ -76,6 +79,11 @@ class CleanModelLoader:
         self.load_in_8bit = load_in_8bit
         self.device_map = device_map
         self.trust_remote_code = trust_remote_code
+
+        # Check if this is a local path
+        self.is_local_path = Path(model_name).exists()
+        if self.is_local_path:
+            logger.info(f"📁 Using local model path: {model_name}")
 
         # Verify this is a base model (not instruct)
         if "instruct" in model_name.lower() or "chat" in model_name.lower():

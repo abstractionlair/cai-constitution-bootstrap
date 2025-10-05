@@ -208,8 +208,14 @@ def generate_dataset_slice(
     logger.info("")
 
     # Initialize model loader
+    # Check for local model path (avoids HF cache writes on quota-limited filesystems)
+    import os
+    model_path = os.environ.get('MODEL_PATH', 'Qwen/Qwen2.5-32B')
+    if model_path != 'Qwen/Qwen2.5-32B':
+        logger.info(f"Using MODEL_PATH environment variable: {model_path}")
+
     logger.info("Loading model (this may take a few minutes)...")
-    loader = CleanModelLoader("Qwen/Qwen2.5-32B", load_in_4bit=True)
+    loader = CleanModelLoader(model_path, load_in_4bit=True)
     model, tokenizer, provenance = loader.load()
 
     logger.info(f"✅ Model loaded on GPU {gpu_id}")
