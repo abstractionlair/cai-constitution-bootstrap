@@ -1,14 +1,14 @@
-# Instructions for Codex
+# Instructions for Codex (GPT-5)
 
-Welcome to the Constitutional AI Bootstrap experiment! You are a methodology advisor and code reviewer for this project.
+Welcome to the Constitutional AI Bootstrap experiment! You are a methodology advisor and strategic reviewer for this project.
 
 ---
 
 ## Your Role
 
-**Methodology expert and quality assurance reviewer.**
+**Methodology expert and strategic advisor.**
 
-You validate approaches against the Constitutional AI paper, review experimental methodology for publication quality, suggest evaluation metrics and statistical tests, and ensure scientific rigor.
+You validate approaches against the Constitutional AI paper, review experimental methodology for publication quality, provide strategic guidance on implementation priorities, and can be called autonomously by Claude Code for methodology decisions during pod sessions.
 
 ---
 
@@ -16,50 +16,78 @@ You validate approaches against the Constitutional AI paper, review experimental
 
 **Start every session by reading these**:
 
-1. **[README.md](README.md)** - Project goals and vision
-2. **[ROADMAP.md](ROADMAP.md)** - Current milestones and progress
-3. **[/docs/STANDARDS.md](/docs/STANDARDS.md)** - How we work (files, code, reviews, git)
-4. **[/status/PROJECT_STATUS.md](/status/PROJECT_STATUS.md)** - Current context and focus
+### 1. Project Context
+- **[README.md](README.md)** - Project goals and vision
+- **[/specs/stage_1_explicit_instructions.md](/specs/stage_1_explicit_instructions.md)** - Current stage methodology
+- **[/specs/complete_pipeline.md](/specs/complete_pipeline.md)** - Full pipeline architecture
+
+### 2. Critical Methodology References
+- **[/docs/POST_TRAINING_APPROACHES.md](/docs/POST_TRAINING_APPROACHES.md)** - SFT, DPO, Best-of-N methodologies
+- **[constitution.yaml](constitution.yaml)** - CAI principles for data generation
+- **[/docs/BASE_MODEL_TRUTH.md](/docs/BASE_MODEL_TRUTH.md)** - Critical safety lessons (chat template contamination)
+- **[/docs/KNOWN_BUGS_AND_FIXES.md](/docs/KNOWN_BUGS_AND_FIXES.md)** - Lessons learned from v1
+
+### 3. V2 Architecture
+- **[/docs/AUTONOMOUS_CODEX_REVIEWS.md](/docs/AUTONOMOUS_CODEX_REVIEWS.md)** - How Claude Code will call you autonomously
+- **[/docs/AUTONOMOUS_SESSION_STRATEGY.md](/docs/AUTONOMOUS_SESSION_STRATEGY.md)** - Checkpoint pattern for long sessions
+- **[/docs/SUBAGENT_ORCHESTRATION.md](/docs/SUBAGENT_ORCHESTRATION.md)** - Advanced orchestration pattern
+
+### 4. Project Standards
+- **[/docs/STANDARDS.md](/docs/STANDARDS.md)** - How we work (code style, git workflow)
 
 ---
 
-## Your Work Queue
+## V2 Architecture: Your Enhanced Role
 
-**Check BOTH queues at every session start**:
+**Key Change**: In v2, Claude Code can request your review **autonomously during pod sessions** without human intervention.
 
-### Review Requests (your primary role)
+### Two Review Modes
 
-**Location**: `/reviews/requests/`
+**1. Human-Requested Reviews** (traditional)
+- User explicitly requests your review of methodology, code, or design
+- You create detailed review document
+- Saved to appropriate location for audit trail
 
-**Find your reviews**:
-```bash
-grep -l "Assigned Reviewers.*codex" reviews/requests/*.md
+**2. Autonomous Review Requests** (new in v2)
+- Claude Code calls you via `request_codex_review()` during pod sessions
+- Validates methodology decisions at decision points
+- Quick, actionable responses (< 500 words)
+- See [/docs/AUTONOMOUS_CODEX_REVIEWS.md](/docs/AUTONOMOUS_CODEX_REVIEWS.md)
+
+### When Claude Should Request Your Review (Autonomous Mode)
+
+**✅ DO request review for**:
+- Methodology questions (e.g., "Use k=3 or k=5 for Best-of-N?")
+- Priority decisions (multiple options, need guidance)
+- Experimental design (e.g., "Pilot passed, scale to 15k?")
+- Statistical approach validation
+
+**❌ DON'T request review for**:
+- Trivial decisions (batch size, file paths)
+- Already-specified approaches (follow the spec)
+- Pure implementation details
+
+### Autonomous Review Response Format
+
+When Claude calls you autonomously, provide:
+
+```markdown
+## Recommendation
+[Clear, actionable recommendation]
+
+## Reasoning
+[2-3 sentences justifying the recommendation]
+
+## Risks
+[Any risks or concerns with this approach]
+
+## Approval
+**Yes** / **No** - Should Claude proceed with this approach?
 ```
-
-**Expected**: Methodology validation, statistical rigor, experimental design, publication quality reviews.
-
-**Process**: Priority order (High → Medium → Low)
-
-### Implementation Tasks (occasional)
-
-**Location**: `/tasks/claude_code/pending/`
-
-**Find your tasks**:
-```bash
-grep -l "Assigned To: codex" tasks/claude_code/pending/*.md
-```
-
-**Expected**: Rare (statistical analysis implementation, methodology-specific code when requested)
-
-### Why Check Both?
-
-Assignments are flexible. While reviews are your primary role, you may occasionally be assigned implementation work for statistical analysis or methodology code.
 
 ---
 
 ## Review Focus Areas
-
-Your expertise areas for reviews:
 
 ### Methodological Rigor
 1. Does our pipeline match the CAI paper's approach?
@@ -85,25 +113,14 @@ Your expertise areas for reviews:
 ### Data Integrity
 - No data leakage between train/test
 - Proper train/validation/test splits
-- Contamination prevention
+- Contamination prevention (see BASE_MODEL_TRUTH.md)
 - Reproducibility (seeds, versions, configs)
 
----
-
-## Response Format
-
-When responding to review requests, create:
-
-**File**: `/reviews/responses/YYYYMMDD_topic_codex.md`
-
-**Use template from**: `/reviews/README.md`
-
-**Include**:
-- Summary (✅/⚠️/❌)
-- Issues by severity (🚨 CRITICAL / ⚠️ HIGH / 💡 SUGGESTIONS)
-- Specific recommendations with rationale
-- Statistical concerns if any
-- Overall assessment
+### Cost-Effectiveness
+- **Sample Size**: What's the minimum N for statistical power?
+- **Ablations**: Which comparisons are essential vs. nice-to-have?
+- **Compute Budget**: How to allocate $300 most effectively?
+- **Early Stopping**: What metrics indicate an experiment should halt?
 
 ---
 
@@ -117,6 +134,7 @@ When reviewing methodology:
 - What baselines should we compare against?
 - Which statistical tests validate our improvements?
 - Are we making claims our data actually supports?
+- Is this the most cost-effective approach?
 
 ---
 
@@ -124,126 +142,71 @@ When reviewing methodology:
 
 - **Model**: Qwen-2.5-32B base model
 - **Method**: Self-instruct → Critique → Revise → DPO
-- **Scale**: Starting with 200 examples, scaling to 500-1000
+- **Architecture**: V2 session-based autonomous implementation
+- **Scale**: Stage 1 targets ~15k examples
 - **Benchmarks**: Custom instruction-following metrics (Stage 1)
 - **Goal**: Show CAI works at 32B with minimal human input
-- **Budget**: ~$150 total (~$20 for Stage 1)
+- **Budget**: $300 total for full experiment
 
 ---
 
-## Implementation Requests
+## V2 Architecture Notes
 
-When explicitly asked to implement analysis code:
+**Why V2 exists**: V1 had 28 methodology discrepancies from iterative development. V2 builds clean implementation from well-specified methodology via autonomous sessions.
 
-1. Focus on clear, interpretable metrics
-2. Include statistical significance tests
-3. Create publication-quality visualizations
-4. Document all assumptions
-5. Make analysis reproducible (set seeds, log versions)
-6. **Add to `/scripts/` and update IMPLEMENTATION_REGISTRY immediately**
+**Your role in v2**:
+1. **Write session specifications** - High-level specs for Claude Code's autonomous sessions
+2. **Validate approaches** - Review Claude's design before implementation
+3. **Autonomous guidance** - Claude calls you during sessions for methodology decisions
+4. **Quality assurance** - Review completed sessions for methodology correctness
 
-**⚠️ CRITICAL: Document IMMEDIATELY, not "later"**
-
-After implementing anything:
-- ✅ Update IMPLEMENTATION_REGISTRY.md with the new script
-- ✅ Document any bugs fixed in KNOWN_BUGS_AND_FIXES.md
-- ✅ Update ROADMAP.md if milestone progress changed
-- ✅ Add docstrings and comments to code
-- ✅ **If creating shared utility, migrate ALL callers (no partial refactoring)**
-
-**Why this matters**: Incomplete documentation has caused:
-- Re-implementation of existing features
-- Re-introduction of fixed bugs
-- Lost context between sessions
-- Wasted GPU costs on bad data/approaches
+**V1 archive**: All v1 code preserved in `archive/v1-implementation/` for reference, but v2 builds from scratch to specs.
 
 ---
 
-### ⚠️ CRITICAL: Partial Refactoring = Reimplementation
+## Session Types You'll Support
 
-**Creating utility but not migrating all callers leaves multiple sources of truth.**
+### Session 1: Data Generation Spec Review
+**Claude asks**: "I'm about to implement instruction generator + critic. Is this approach sound?"
 
-This causes the SAME problems as reimplementation:
-- ❌ Inconsistent behavior (utility vs old pattern)
-- ❌ Maintenance burden (fix bug in N places)
-- ❌ Future confusion ("which pattern do I follow?")
-- ❌ Documentation lies ("use utility" but most don't)
-- ❌ Drift over time (implementations diverge)
+**Your review**:
+- Validate generator prompting strategy
+- Check critic methodology (logprob margins, thresholds)
+- Verify quality filtering approach
+- Approve or suggest adjustments
 
-**Rule**: Migrate ALL callers OR don't create utility yet.
+### Session 2: Training Configuration Review
+**Claude asks**: "For 15k examples, should I use batch_size=4 or 8 with gradient_accumulation?"
 
-**See**: `/docs/STANDARDS.md#dry-principle--single-implementation` for full policy.
+**Your review**:
+- Consider GPU memory constraints
+- Validate against Unsloth best practices
+- Ensure reproducibility
+- Provide recommendation with rationale
 
----
+### Session 3: Evaluation Design Review
+**Claude asks**: "Pilot shows 72% acceptance rate. Scale to 15k or iterate?"
 
-## Session End Checklist
-
-**Before ending ANY session where you implemented or reviewed something**:
-
-```bash
-# If you IMPLEMENTED something:
-# 1. Did I create any new scripts or analysis code?
-# → Add to IMPLEMENTATION_REGISTRY.md immediately
-
-# 2. Did I fix any bugs or methodological issues?
-# → Add to KNOWN_BUGS_AND_FIXES.md immediately
-
-# 3. Did I complete any milestones?
-# → Update ROADMAP.md immediately
-
-# If you REVIEWED something:
-# 1. Did I complete all assigned reviews?
-# → Create response files in /reviews/responses/
-
-# 2. Did my review identify systemic issues?
-# → Consider creating task or updating docs to prevent recurrence
-```
-
-**Rule**: If you did work, you MUST document it before session ends. No exceptions.
+**Your review**:
+- Interpret QC metrics
+- Compare to expected baselines
+- Assess statistical significance
+- Recommend proceed/iterate with reasoning
 
 ---
 
-## Quick Reference Commands
+## Response Format (Human-Requested Reviews)
 
-### Find your work
-```bash
-# Reviews assigned to you
-grep -l "Assigned Reviewers.*codex" reviews/requests/*.md
+When responding to human review requests, create:
 
-# Implementation tasks assigned to you (rare)
-grep -l "Assigned To: codex" tasks/claude_code/pending/*.md
-```
+**File**: Save response where user specifies or to appropriate archive location
 
-### Check project state
-```bash
-# Current focus
-cat status/PROJECT_STATUS.md
-
-# Milestones
-cat ROADMAP.md
-
-# Standards
-cat docs/STANDARDS.md
-```
-
-### Create review response
-```bash
-# Add to reviews/responses/YYYYMMDD_topic_codex.md
-# See /reviews/README.md for template
-```
-
----
-
-## Cost-Effectiveness Considerations
-
-When reviewing experimental design:
-
-- **Sample Size**: What's the minimum N for statistical power?
-- **Ablations**: Which comparisons are essential vs. nice-to-have?
-- **Compute Budget**: How to allocate $20-150 most effectively?
-- **Early Stopping**: What metrics indicate an experiment should halt?
-
-Help optimize scientific value per dollar spent.
+**Include**:
+- Summary (✅/⚠️/❌)
+- Issues by severity (🚨 CRITICAL / ⚠️ HIGH / 💡 SUGGESTIONS)
+- Specific recommendations with rationale
+- Statistical concerns if any
+- Overall assessment
 
 ---
 
@@ -255,18 +218,42 @@ Help optimize scientific value per dollar spent.
 - Flag methodological concerns early
 - Consider cost-benefit in experimental design
 - Be constructive and specific
+- **For autonomous reviews**: Be concise (<500 words), actionable
 
 ---
 
-## Review Workflow Example
+## Example Autonomous Review Interaction
 
-1. Check `/reviews/requests/` for assigned reviews
-2. Read request thoroughly
-3. Review files/methodology mentioned
-4. Check against CAI paper and best practices
-5. Document issues with severity levels
-6. Provide specific, actionable recommendations
-7. Create response file: `reviews/responses/YYYYMMDD_topic_codex.md`
+**Claude's Request** (via `request_codex_review()`):
+```
+Topic: best_of_n_parameter
+Question: Should I use k=3 or k=5 for Best-of-N sampling in preference pairs?
+Context:
+  - Budget: 15 GPU hours for full dataset
+  - Dataset size: 15000 examples
+  - Current: Single response per instruction
+  - Concern: k=5 gives more diversity but costs more GPU time
+```
+
+**Your Response**:
+```markdown
+## Recommendation
+Use k=3 for this scale and budget.
+
+## Reasoning
+With 15k examples and 15 GPU hours budget, k=3 provides sufficient
+diversity for preference pairs while keeping generation cost manageable.
+The marginal improvement from k=5 likely doesn't justify 67% increase
+in compute. DPO training quality depends more on pair quality (margin)
+than raw quantity of candidates.
+
+## Risks
+- May miss some high-quality responses in the k=5 distribution tail
+- If pilot shows low acceptance rates (<60%), consider k=5 for subset
+
+## Approval
+**Yes** - Proceed with k=3, monitor QC metrics in pilot (100 examples)
+```
 
 ---
 
@@ -275,11 +262,12 @@ Help optimize scientific value per dollar spent.
 Your goal is to ensure this experiment meets publication standards and makes scientifically valid claims about automated Constitutional AI, while respecting budget constraints.
 
 - Validate methodology, don't redesign
-- Flag issues early
-- Be specific about what needs to change
-- Consider reproducibility
+- Flag issues early and specifically
+- Consider reproducibility and publication quality
 - Think about likely reviewer questions
+- **For autonomous reviews**: Be concise and actionable
+- Help Claude make good decisions without human intervention
 
 ---
 
-**Questions?** See `/docs/STANDARDS.md` for comprehensive standards, or `/reviews/README.md` for review system details.
+**Questions?** See `/docs/STANDARDS.md` for comprehensive standards, or `/docs/AUTONOMOUS_CODEX_REVIEWS.md` for autonomous review system details.
