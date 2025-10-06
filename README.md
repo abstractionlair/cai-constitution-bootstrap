@@ -41,17 +41,16 @@ Each stage produces a functional model that helps generate training data for the
 **New to this project?**
 
 1. **This file** - Project goals and approach
-2. **[ROADMAP.md](ROADMAP.md)** - Milestones and progress
-3. **[/docs/TECHNICAL_SETUP.md](/docs/TECHNICAL_SETUP.md)** - Model, hardware, training details
-4. **[/docs/STANDARDS.md](/docs/STANDARDS.md)** - How we work
-5. **[/status/PROJECT_STATUS.md](/status/PROJECT_STATUS.md)** - Current focus
+2. **[/specs/stage_1_explicit_instructions.md](/specs/stage_1_explicit_instructions.md)** - Current stage methodology
+3. **[/specs/complete_pipeline.md](/specs/complete_pipeline.md)** - Full pipeline architecture
+4. **[/docs/TECHNICAL_SETUP.md](/docs/TECHNICAL_SETUP.md)** - Model, hardware, training details
+5. **[/docs/STANDARDS.md](/docs/STANDARDS.md)** - How we work
 
-**Want to understand the code?**
+**Critical lessons learned (v1 → v2):**
 
-- **[/docs/IMPLEMENTATION_REGISTRY.md](/docs/IMPLEMENTATION_REGISTRY.md)** - Catalog of scripts
-- **[/docs/KNOWN_BUGS_AND_FIXES.md](/docs/KNOWN_BUGS_AND_FIXES.md)** - Bug history
-- **[/docs/BASE_MODEL_TRUTH.md](/docs/BASE_MODEL_TRUTH.md)** - Critical quirks
-- **[/scripts/](/scripts/)** - Implementation
+- **[/docs/BASE_MODEL_TRUTH.md](/docs/BASE_MODEL_TRUTH.md)** - Chat template contamination (critical!)
+- **[/docs/KNOWN_BUGS_AND_FIXES.md](/docs/KNOWN_BUGS_AND_FIXES.md)** - Bugs we've fixed
+- **[/docs/POST_TRAINING_APPROACHES.md](/docs/POST_TRAINING_APPROACHES.md)** - Methodology references
 
 **For AI agents:**
 
@@ -63,7 +62,12 @@ Each stage produces a functional model that helps generate training data for the
 
 ## Current Status
 
-Working on Stage 1 (teaching explicit instruction following). See [ROADMAP.md](ROADMAP.md) for progress.
+**V2 Clean Restart**: Building Stage 1 from scratch via autonomous agentic sessions.
+
+- V1 implementation archived to `archive/v1-implementation/` (28 methodology discrepancies found)
+- V2 builds clean implementation from specs via session-based approach
+- GPT-5 writing high-level session specifications
+- Claude Code executing autonomous implementation sessions on pod
 
 ---
 
@@ -71,6 +75,8 @@ Working on Stage 1 (teaching explicit instruction following). See [ROADMAP.md](R
 
 This is a personal research project exploring automated post-training methods. It's heavily AI-assisted (Claude Code for implementation, Gemini and Codex for review), which is itself an experiment in human-AI collaboration for research.
 
+**Architecture**: V2 uses autonomous agentic sessions where Claude Code builds implementation from specs with minimal human intervention. See [CLAUDE.md](CLAUDE.md) for details.
+
 ---
 
-**Questions?** See `/docs/STANDARDS.md` for how things work, or `/status/PROJECT_STATUS.md` for current context.
+**Questions?** See `/docs/STANDARDS.md` for how things work, or [CLAUDE.md](CLAUDE.md) for autonomous session architecture.

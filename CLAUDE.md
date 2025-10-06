@@ -8,171 +8,169 @@ Welcome to the Constitutional AI Bootstrap experiment! You are the primary imple
 
 **Primary implementer** for this automated Constitutional AI training pipeline.
 
-You write code, execute training on RunPod, transfer results, and iterate through milestones progressively.
+You build the implementation from scratch based on high-level session specifications, execute training on RunPod, and iterate through progressive milestones.
 
 ---
 
-## Essential Reading (In Order)
+## Essential Reading (DAG Structure)
 
-**Start every session by reading these**:
+**Start every session by reading these in order**:
 
-1. **[README.md](README.md)** - Project goals and vision
-2. **[ROADMAP.md](ROADMAP.md)** - Current milestones and progress
-3. **[/docs/STANDARDS.md](/docs/STANDARDS.md)** - How we work (files, code, reviews, git)
-4. **[/status/PROJECT_STATUS.md](/status/PROJECT_STATUS.md)** - Current context and focus
+### 1. Project Context
+- **[README.md](README.md)** - Project goals and vision
+- **[/specs/stage_1_explicit_instructions.md](/specs/stage_1_explicit_instructions.md)** - Current stage methodology
+- **[/specs/complete_pipeline.md](/specs/complete_pipeline.md)** - Full pipeline architecture
 
----
+### 2. Critical Safety & Lessons
+- **[/docs/BASE_MODEL_TRUTH.md](/docs/BASE_MODEL_TRUTH.md)** - **CRITICAL**: Chat template contamination issue
+  - Contains sentinel tests to detect contamination
+  - **Must read before any base model work**
+- **[/docs/KNOWN_BUGS_AND_FIXES.md](/docs/KNOWN_BUGS_AND_FIXES.md)** - **CRITICAL**: Lessons learned
+  - Prevents reproducing bugs we've already fixed
+  - **Read before implementing similar features**
 
-## Your Work Queue
+### 3. Methodology References
+- **[/docs/POST_TRAINING_APPROACHES.md](/docs/POST_TRAINING_APPROACHES.md)** - SFT, DPO, Best-of-N methodologies
+- **[/docs/FEW_SHOT_PROMPTING.md](/docs/FEW_SHOT_PROMPTING.md)** - Prompting strategies
+- **[constitution.yaml](constitution.yaml)** - CAI principles for data generation
 
-**Check BOTH queues at every session start**:
+### 4. Autonomous Operation Patterns
+- **[/docs/AUTONOMOUS_SESSION_STRATEGY.md](/docs/AUTONOMOUS_SESSION_STRATEGY.md)** - **Required for pod sessions**
+  - Checkpoint-driven workflow resilient to auto-compaction
+  - How to structure work for long autonomous runs
+  - See also: [/docs/SUBAGENT_ORCHESTRATION.md](/docs/SUBAGENT_ORCHESTRATION.md) for advanced pattern
+- **[/docs/AUTONOMOUS_CODEX_REVIEWS.md](/docs/AUTONOMOUS_CODEX_REVIEWS.md)** - How to request methodology reviews
+  - Call GPT-5/Codex for validation during autonomous work
+  - When to request reviews vs proceed autonomously
+- **[/docs/SUBAGENT_ORCHESTRATION.md](/docs/SUBAGENT_ORCHESTRATION.md)** - Advanced: Spawning subagents
+  - Alternative to checkpoint pattern for complex multi-phase work
+  - See also: [/docs/AUTONOMOUS_SESSION_STRATEGY.md](/docs/AUTONOMOUS_SESSION_STRATEGY.md) for checkpoint approach
 
-### Implementation Tasks (your primary role)
-
-**Location**: `/tasks/claude_code/pending/`
-
-**Find your tasks**:
-```bash
-grep -l "Assigned To: claude_code" tasks/claude_code/pending/*.md
-```
-
-**Expected**: Most implementation tasks will be assigned to you.
-
-**Process**: Priority order (P0 → P1 → P2 → P3)
-
-### Review Requests (occasional)
-
-**Location**: `/reviews/requests/`
-
-**Find your reviews**:
-```bash
-grep -l "Assigned Reviewers.*claude_code" reviews/requests/*.md
-```
-
-**Expected**: Rare (self-review requests, sanity checks)
-
-### Why Check Both?
-
-Assignments are flexible. While implementation is your primary role, you may occasionally be assigned review work for self-checks or quick validations.
+### 5. Project Standards
+- **[/docs/STANDARDS.md](/docs/STANDARDS.md)** - How we work (code style, git workflow, DRY principle)
 
 ---
 
-## Critical Anti-Patterns (Must Read!)
+## V2 Architecture: Session-Based Implementation
 
-### Before Implementing Anything
+**Key Change**: You will receive **high-level session specifications** from GPT-5, not granular task tickets.
 
-1. ✅ **Check IMPLEMENTATION_REGISTRY** first
-   - Location: `/docs/IMPLEMENTATION_REGISTRY.md`
-   - Prevents re-implementing existing features
-   - 40+ scripts already exist - don't duplicate!
+### Session Structure
 
-2. ✅ **Check KNOWN_BUGS_AND_FIXES** before debugging
-   - Location: `/docs/KNOWN_BUGS_AND_FIXES.md`
-   - Prevents reproducing old bugs
-   - We've fixed many bugs - don't repeat them!
+**Typical session**:
+1. **Read session spec** - High-level goals and success criteria
+2. **Read mandatory context** - Safety docs, methodology refs
+3. **Design phase** - Create implementation plan
+4. **Codex review** - Request validation of approach (use `/docs/AUTONOMOUS_CODEX_REVIEWS.md`)
+5. **Implement with checkpoints** - Follow checkpoint pattern from `/docs/AUTONOMOUS_SESSION_STRATEGY.md`
+6. **Validate** - Run tests, verify output
+7. **Document** - Update relevant docs
 
-3. ✅ **Read BASE_MODEL_TRUTH** before base model work
-   - Location: `/docs/BASE_MODEL_TRUTH.md`
-   - Critical: Chat template contamination issue
-   - Contains sentinel tests to detect contamination
+### Example Sessions
 
-### After Implementing
+**Session 1: Data Generation** (4-6 hours)
+- Build instruction generator, critic, and quality filtering
+- Generate 15k instruction-following examples
+- Output: `data/stage1_sft_data.jsonl` with full provenance
 
-**⚠️ CRITICAL: Document IMMEDIATELY, not "later"**
+**Session 2: SFT Training** (3-4 hours)
+- Build SFT trainer with Unsloth
+- Train on Session 1 output
+- Output: Stage 1 SFT checkpoint
 
-1. ✅ Update IMPLEMENTATION_REGISTRY with what you built
-2. ✅ Document any bugs fixed in KNOWN_BUGS_AND_FIXES
-3. ✅ Add docstrings and comments to code
-4. ✅ Update ROADMAP.md if milestone progress changed
-5. ✅ **If creating shared utility, migrate ALL callers (no partial refactoring)**
-
-**Why this matters**: Incomplete documentation has caused us to:
-- Re-implement existing features multiple times
-- Re-introduce bugs we already fixed
-- Waste GPU time training on contaminated data
-- Lose context between sessions
-
-**Example**: The 60% registry gap (17/43 scripts documented) meant we couldn't check "does X exist?" reliably, leading to reimplementation.
+**Session 3: Evaluation** (2-3 hours)
+- Build evaluation harness
+- Compare base vs SFT model
+- Output: Decision to proceed to DPO or iterate
 
 ---
 
-### ⚠️ CRITICAL: Partial Refactoring = Reimplementation
+## Critical Anti-Patterns (V2 Focus)
 
-**Creating utility but not migrating all callers leaves multiple sources of truth.**
+### ⚠️ Chat Template Contamination
 
-This causes the SAME problems as reimplementation:
-- ❌ Inconsistent behavior (utility vs old pattern)
-- ❌ Maintenance burden (fix bug in N places)
-- ❌ Future confusion ("which pattern do I follow?")
-- ❌ Documentation lies ("use utility" but most don't)
-- ❌ Drift over time (implementations diverge)
+**Before any model loading**:
+1. Read `/docs/BASE_MODEL_TRUTH.md`
+2. Always use pattern:
+   ```python
+   tokenizer = AutoTokenizer.from_pretrained(model_name)
+   tokenizer.chat_template = None  # CRITICAL!
+   ```
+3. Verify with sentinel tests
 
-**Rule**: Migrate ALL callers OR don't create utility yet.
+**Why this matters**: We wasted GPU time training on contaminated data in v1.
 
-**Example**: Creating `CleanModelLoader` but leaving 13/15 scripts with manual `chat_template = None` means we have TWO patterns, not one. This is WORSE than having one consistent (bad) pattern.
+### ⚠️ Checkpoint Frequently in Long Sessions
 
-**See**: `/docs/STANDARDS.md#dry-principle--single-implementation` for full policy.
+**On pod with auto-compaction**:
+- Use checkpoint pattern from `/docs/AUTONOMOUS_SESSION_STRATEGY.md`
+- Write state to files after each phase
+- Never hold critical state only in memory
+
+**Alternative**: Subagent pattern from `/docs/SUBAGENT_ORCHESTRATION.md`
+
+### ⚠️ Request Codex Review for Methodology Decisions
+
+**Don't guess on methodology**:
+- Use `/docs/AUTONOMOUS_CODEX_REVIEWS.md` pattern
+- Request review before implementing complex features
+- Cost: ~$0.10-0.20 per session vs $5-20 for GPU mistakes
+
+### ⚠️ Document As You Go
+
+**After implementing**:
+1. ✅ Add docstrings to code
+2. ✅ Document bugs fixed in `/docs/KNOWN_BUGS_AND_FIXES.md`
+3. ✅ Update methodology docs if you discovered patterns
+
+**Rule**: If you did work, update docs before session ends.
 
 ---
 
 ## Session End Checklist
 
-**Before ending ANY session where you implemented, fixed, or created something**:
+**Before ending ANY implementation session**:
 
 ```bash
-# 1. Did I create any new scripts?
-# → Add to IMPLEMENTATION_REGISTRY.md immediately
+# 1. Did I fix any bugs?
+# → Document in /docs/KNOWN_BUGS_AND_FIXES.md
 
-# 2. Did I fix any bugs?
-# → Add to KNOWN_BUGS_AND_FIXES.md immediately
+# 2. Did I discover safety issues?
+# → Document in /docs/BASE_MODEL_TRUTH.md or relevant doc
 
-# 3. Did I complete any milestones or tasks?
-# → Update ROADMAP.md immediately
+# 3. Did I implement patterns worth documenting?
+# → Add to /docs/ with clear examples
 
-# 4. Did I discover anything important about the codebase?
-# → Add to relevant /docs/ file or create new doc
+# 4. Did I write all checkpoint files?
+# → Verify artifacts/ has session output
 
-# 5. Did I deprecate or archive anything?
-# → Mark clearly and create breadcrumb files
+# 5. Are all code files documented?
+# → Add docstrings and comments
 ```
 
-**Rule**: If you did work, you MUST update documentation before session ends. No exceptions.
+**Why this matters**: Next session needs to bootstrap from your artifacts and docs.
 
 ---
 
-## Claude Code-Specific Operations
+## RunPod Operations
 
-### Task Management
+### Pod Access
 
-**Lifecycle**: `pending/` → `in_progress/` → `completed/` or `obsolete/`
+See `/status/RUNPOD_STATUS.md` for current connection details.
 
-**When starting a task**:
-```bash
-mv tasks/claude_code/pending/TASK.md tasks/claude_code/in_progress/
-```
+**Note**: When running autonomously on pod, this file becomes less relevant (you're already there).
 
-**When completing**:
-1. Add completion notes to task file
-2. Move to completed:
-```bash
-mv tasks/claude_code/in_progress/TASK.md tasks/claude_code/completed/
-```
+### Pod Setup
 
-### RunPod Deployment
+See:
+- `/docs/TECHNICAL_SETUP.md` - Initial pod configuration
+- `/docs/NETWORK_VOLUME_SETUP.md` - Persistent storage setup
+- `/docs/RUNPOD_QUICK_START.md` - Quick start guide
+- `/docs/RUNPOD_SSH_GUIDE.md` - SSH connection guide
 
-See `/status/RUNPOD_STATUS.md` for:
-- SSH access (direct SSH, not stable proxy!)
-- File transfer (use SSH pipes, not scp)
-- Pod management
-- Cost tracking
+---
 
-**Quick reference**:
-```bash
-export RUNPOD_PORT=48550  # Update after pod restart!
-ssh -p $RUNPOD_PORT -i ~/.ssh/id_ed25519 root@195.26.233.96
-```
-
-### Git Workflow
+## Git Workflow
 
 See `/docs/STANDARDS.md#git-workflow` for complete details.
 
@@ -182,44 +180,22 @@ See `/docs/STANDARDS.md#git-workflow` for complete details.
 - NEVER force push to main
 - ALWAYS include co-authorship attribution
 
----
-
-## Quick Reference Commands
-
-### Find your work
+**Standard commit format**:
 ```bash
-# Tasks assigned to you
-grep -l "Assigned To: claude_code" tasks/claude_code/pending/*.md
+git commit -m "Brief description
 
-# Reviews assigned to you (rare)
-grep -l "Assigned Reviewers.*claude_code" reviews/requests/*.md
+Detailed explanation of changes.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
-
-### Check what exists
-```bash
-# See what's implemented
-cat docs/IMPLEMENTATION_REGISTRY.md
-
-# See known bugs
-cat docs/KNOWN_BUGS_AND_FIXES.md
-
-# Check current focus
-cat status/PROJECT_STATUS.md
-```
-
-### Create review request
-```bash
-# Add to reviews/requests/YYYYMMDD_topic.md
-# Must include: Assigned Reviewers field
-```
-
-See `/reviews/README.md` for review request template.
 
 ---
 
 ## Key Constraints
 
-- **Hardware**: RunPod GPU pods (opportunistically using available high-end GPUs: H100, A100, etc. in single or multi-GPU configurations)
+- **Hardware**: RunPod GPU pods (H100, A100, etc. in single or multi-GPU configurations)
 - **Model**: Qwen-2.5-32B base model
 - **Framework**: Unsloth for efficient training
 - **Budget**: $300 total for full experiment (~$2-3/hour typical GPU cost)
@@ -231,25 +207,75 @@ See `/reviews/README.md` for review request template.
 
 **This is NOT just testing** - each stage builds a functional model!
 
-### Current: Stage 1 - Explicit Instruction Following
-- Generate explicit instructions
+### Stage 1 - Explicit Instruction Following
+- Generate explicit instructions via model self-generation
+- Use logprob-based quality filtering
 - Train until 95%+ instruction following
 - Output: Model that reliably follows explicit instructions
 - This model helps generate data for Stage 2
 
-See `ROADMAP.md` and `/specs/stage_1_explicit_instructions.md` for details.
+See `/specs/stage_1_explicit_instructions.md` for full methodology.
 
 **Future stages** build progressively on Stage 1 output.
 
 ---
 
+## Quick Reference
+
+### Find essential docs
+```bash
+# Critical safety
+cat docs/BASE_MODEL_TRUTH.md
+cat docs/KNOWN_BUGS_AND_FIXES.md
+
+# Methodology
+cat docs/POST_TRAINING_APPROACHES.md
+cat specs/stage_1_explicit_instructions.md
+
+# Autonomous patterns
+cat docs/AUTONOMOUS_SESSION_STRATEGY.md
+cat docs/AUTONOMOUS_CODEX_REVIEWS.md
+```
+
+### Check session output
+```bash
+# Your artifacts from current session
+ls -la artifacts/
+
+# Generated data
+ls -la data/
+
+# Training outputs
+ls -la output/
+```
+
+### Reference v1 implementation
+```bash
+# All v1 code archived here (reference only, don't copy)
+ls archive/v1-implementation/scripts/
+
+# View old script
+cat archive/v1-implementation/scripts/generate_sample_data_v2.py
+```
+
+---
+
 ## Remember
 
-- Maximum automation with minimal human intervention
-- Reproducibility is critical (set seeds, log versions, save configs)
-- Document progress and decisions
+- **Build from specs**, not from v1 code (v1 has accumulated cruft)
+- **Checkpoint frequently** in long sessions (auto-compaction will happen)
+- **Request Codex review** for methodology decisions
+- **Document as you go** (next session depends on your artifacts)
+- **Reproducibility is critical** (set seeds, log versions, save configs)
 - This is research/publication work, not production
-- Flag issues that might affect experiment validity
+
+---
+
+## Architecture Decision: Clean V2 Restart
+
+**Why v2 exists**: V1 had 28 methodology discrepancies from iterative development. V2 builds clean implementation from well-specified methodology via autonomous sessions.
+
+**V1 archive**: All v1 code preserved in `archive/v1-implementation/` for reference, but v2 builds from scratch to specs.
 
 ---
 

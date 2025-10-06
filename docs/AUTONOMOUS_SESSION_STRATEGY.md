@@ -6,6 +6,10 @@
 
 **Solution**: Structure work to create natural checkpoints where compaction is safe.
 
+**See also**:
+- [AUTONOMOUS_CODEX_REVIEWS.md](AUTONOMOUS_CODEX_REVIEWS.md) - Request methodology reviews during autonomous work
+- [SUBAGENT_ORCHESTRATION.md](SUBAGENT_ORCHESTRATION.md) - Alternative pattern using subagents for indirect context control
+
 ---
 
 ## Checkpoint-Driven Workflow

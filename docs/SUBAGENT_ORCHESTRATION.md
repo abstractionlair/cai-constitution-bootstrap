@@ -4,6 +4,10 @@
 
 **Benefit**: Indirect control over context - subagents have bounded context, main agent stays lean.
 
+**See also**:
+- [AUTONOMOUS_SESSION_STRATEGY.md](AUTONOMOUS_SESSION_STRATEGY.md) - Simpler checkpoint pattern for single-agent sessions
+- [AUTONOMOUS_CODEX_REVIEWS.md](AUTONOMOUS_CODEX_REVIEWS.md) - Request methodology reviews from orchestrator between subagent phases
+
 ---
 
 ## Architecture

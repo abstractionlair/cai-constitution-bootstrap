@@ -2,6 +2,10 @@
 
 **Purpose**: Enable Claude Code agent on pod to request reviews from Codex (GPT-5) without human intervention.
 
+**See also**:
+- [AUTONOMOUS_SESSION_STRATEGY.md](AUTONOMOUS_SESSION_STRATEGY.md) - Checkpoint pattern for structuring long autonomous sessions
+- [SUBAGENT_ORCHESTRATION.md](SUBAGENT_ORCHESTRATION.md) - Orchestrator can request reviews between subagent phases
+
 ---
 
 ## Architecture
