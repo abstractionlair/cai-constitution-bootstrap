@@ -158,19 +158,13 @@ You build the implementation from scratch based on high-level session specificat
 
 ## RunPod Operations
 
-### Pod Access
+**On pod**: See `/runbooks/POD_OPERATIONS.md` for environment setup, caches, git auth, and preflight checks.
 
-See `/status/RUNPOD_STATUS.md` for current connection details.
-
-**Note**: When running autonomously on pod, this file becomes less relevant (you're already there).
-
-### Pod Setup
-
-See:
+**Pod setup references** (for initial configuration):
 - `/docs/TECHNICAL_SETUP.md` - Initial pod configuration
 - `/docs/NETWORK_VOLUME_SETUP.md` - Persistent storage setup
 - `/docs/RUNPOD_QUICK_START.md` - Quick start guide
-- `/docs/RUNPOD_SSH_GUIDE.md` - SSH connection guide
+- `/docs/RUNPOD_SSH_GUIDE.md` - SSH connection guide (for connecting FROM local machine)
 
 ---
 
