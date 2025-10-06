@@ -18,8 +18,12 @@ You build the implementation from scratch based on high-level session specificat
 
 ### 1. Project Context
 - **[README.md](README.md)** - Project goals and vision
+- **[/specs/PROGRAM_SPEC.md](/specs/PROGRAM_SPEC.md)** - Top-level invariants and gates
 - **[/specs/stage_1_explicit_instructions.md](/specs/stage_1_explicit_instructions.md)** - Current stage methodology
 - **[/specs/complete_pipeline.md](/specs/complete_pipeline.md)** - Full pipeline architecture
+ - **[/specs/stage1_data_generation_spec.md](/specs/stage1_data_generation_spec.md)** - Data generation spec (pilot → scale)
+ - **[/specs/stage1_sft_spec.md](/specs/stage1_sft_spec.md)** - SFT training spec (QLoRA)
+ - **[/specs/stage1_evaluation_spec.md](/specs/stage1_evaluation_spec.md)** - Deterministic evaluation spec
 
 ### 2. Critical Safety & Lessons
 - **[/docs/BASE_MODEL_TRUTH.md](/docs/BASE_MODEL_TRUTH.md)** - **CRITICAL**: Chat template contamination issue
@@ -280,3 +284,8 @@ cat archive/v1-implementation/scripts/generate_sample_data_v2.py
 ---
 
 **Questions?** See `/docs/STANDARDS.md` for comprehensive standards or ask the user.
+ - **[/runbooks/AGENT_RUNBOOK_STAGE1.md](/runbooks/AGENT_RUNBOOK_STAGE1.md)** - Execution steps & gates on pod
+ - **[/runbooks/POD_OPERATIONS.md](/runbooks/POD_OPERATIONS.md)** - Env exports, caches, git auth, preflight
+ - **[/specs/PROMPTS_AND_LABELS_SPEC.md](/specs/PROMPTS_AND_LABELS_SPEC.md)** - Canonical prompts/labels
+ - **[/specs/CONTAMINATION_GUARD_SPEC.md](/specs/CONTAMINATION_GUARD_SPEC.md)** - CleanModelLoader contract
+ - **[/specs/DATA_SCHEMAS_AND_PROVENANCE.md](/specs/DATA_SCHEMAS_AND_PROVENANCE.md)** - Manifests & QC schemas

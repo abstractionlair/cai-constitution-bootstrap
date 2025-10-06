@@ -41,10 +41,13 @@ Each stage produces a functional model that helps generate training data for the
 **New to this project?**
 
 1. **This file** - Project goals and approach
-2. **[/specs/stage_1_explicit_instructions.md](/specs/stage_1_explicit_instructions.md)** - Current stage methodology
-3. **[/specs/complete_pipeline.md](/specs/complete_pipeline.md)** - Full pipeline architecture
-4. **[/docs/TECHNICAL_SETUP.md](/docs/TECHNICAL_SETUP.md)** - Model, hardware, training details
-5. **[/docs/STANDARDS.md](/docs/STANDARDS.md)** - How we work
+2. **[/specs/PROGRAM_SPEC.md](/specs/PROGRAM_SPEC.md)** - Top-level invariants and gates
+3. **[/specs/stage_1_explicit_instructions.md](/specs/stage_1_explicit_instructions.md)** - Current stage methodology
+4. **[/specs/complete_pipeline.md](/specs/complete_pipeline.md)** - Full pipeline architecture
+5. **[/specs/stage1_data_generation_spec.md](/specs/stage1_data_generation_spec.md)**, **[/specs/stage1_sft_spec.md](/specs/stage1_sft_spec.md)**, **[/specs/stage1_evaluation_spec.md](/specs/stage1_evaluation_spec.md)**
+6. **[/runbooks/AGENT_RUNBOOK_STAGE1.md](/runbooks/AGENT_RUNBOOK_STAGE1.md)** and **[/runbooks/POD_OPERATIONS.md](/runbooks/POD_OPERATIONS.md)**
+7. **[/docs/TECHNICAL_SETUP.md](/docs/TECHNICAL_SETUP.md)** - Model, hardware, training details
+8. **[/docs/STANDARDS.md](/docs/STANDARDS.md)** - How we work
 
 **Critical lessons learned (v1 → v2):**
 

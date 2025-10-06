@@ -18,6 +18,7 @@ You validate approaches against the Constitutional AI paper, review experimental
 
 ### 1. Project Context
 - **[README.md](README.md)** - Project goals and vision
+- **[/specs/PROGRAM_SPEC.md](/specs/PROGRAM_SPEC.md)** - Top-level invariants and gates
 - **[/specs/stage_1_explicit_instructions.md](/specs/stage_1_explicit_instructions.md)** - Current stage methodology
 - **[/specs/complete_pipeline.md](/specs/complete_pipeline.md)** - Full pipeline architecture
 
@@ -26,11 +27,16 @@ You validate approaches against the Constitutional AI paper, review experimental
 - **[constitution.yaml](constitution.yaml)** - CAI principles for data generation
 - **[/docs/BASE_MODEL_TRUTH.md](/docs/BASE_MODEL_TRUTH.md)** - Critical safety lessons (chat template contamination)
 - **[/docs/KNOWN_BUGS_AND_FIXES.md](/docs/KNOWN_BUGS_AND_FIXES.md)** - Lessons learned from v1
+ - **[/specs/PROMPTS_AND_LABELS_SPEC.md](/specs/PROMPTS_AND_LABELS_SPEC.md)** - Canonical prompts & A/B labels
+ - **[/specs/CONTAMINATION_GUARD_SPEC.md](/specs/CONTAMINATION_GUARD_SPEC.md)** - Clean loading & sentinel checks
+ - **[/specs/DATA_SCHEMAS_AND_PROVENANCE.md](/specs/DATA_SCHEMAS_AND_PROVENANCE.md)** - Manifests & record schemas
 
 ### 3. V2 Architecture
 - **[/docs/AUTONOMOUS_CODEX_REVIEWS.md](/docs/AUTONOMOUS_CODEX_REVIEWS.md)** - How Claude Code will call you autonomously
 - **[/docs/AUTONOMOUS_SESSION_STRATEGY.md](/docs/AUTONOMOUS_SESSION_STRATEGY.md)** - Checkpoint pattern for long sessions
 - **[/docs/SUBAGENT_ORCHESTRATION.md](/docs/SUBAGENT_ORCHESTRATION.md)** - Advanced orchestration pattern
+ - **[/runbooks/AGENT_RUNBOOK_STAGE1.md](/runbooks/AGENT_RUNBOOK_STAGE1.md)** - Execution playbook on pod
+ - **[/runbooks/POD_OPERATIONS.md](/runbooks/POD_OPERATIONS.md)** - Pod env, caches, git auth
 
 ### 4. Project Standards
 - **[/docs/STANDARDS.md](/docs/STANDARDS.md)** - How we work (code style, git workflow)
