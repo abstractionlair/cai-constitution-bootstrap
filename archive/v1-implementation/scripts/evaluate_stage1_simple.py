@@ -49,6 +49,11 @@ def load_models():
     
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+
+    # CRITICAL: Disable chat template to prevent contamination
+    # See docs/BASE_MODEL_TRUTH.md for why this is essential
+    tokenizer.chat_template = None
+
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     
@@ -89,8 +94,8 @@ def generate_response(model, tokenizer, instruction, max_new_tokens=150):
     
     # Use the instruction as-is (raw instruction)
     prompt = instruction
-    
-    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=1500)
+
+    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=1500, add_special_tokens=False)
     inputs = {k: v.to(model.device) for k, v in inputs.items()}
     
     with torch.no_grad():

@@ -2,6 +2,11 @@
 """
 Generate preference pairs using A/B log-probability evaluation on all 100 responses
 Creates high-quality training data by filtering for confident predictions
+
+REFACTORED (2025-10-06):
+- Uses CleanModelLoader for safe base model loading
+- Reuses shared instruction_critic utilities for consistency
+- Removes duplicate logprob implementation
 """
 
 import json
@@ -18,6 +23,10 @@ import time
 BASE_DIR = Path(os.getenv('CAI_BASE_DIR', '/workspace/runs/stage1_20250911_131105/code'))
 ARTIFACTS_DIR = BASE_DIR / "artifacts"
 sys.path.insert(0, str(BASE_DIR / 'scripts'))
+
+# Import shared utilities (REFACTORED)
+from utils.clean_model_loader import CleanModelLoader
+from utils.instruction_critic import critique_instruction_response_pair
 
 # Configure logging
 logging.basicConfig(
@@ -37,158 +46,11 @@ def save_jsonl(data, filepath):
             json.dump(item, f)
             f.write('\n')
 
-def create_ab_evaluation_prompt(instruction, response):
-    """Create A/B evaluation prompt that ends with single token completion"""
-    
-    # Clean up the response - take first paragraph only
-    clean_response = response.split('\n\n')[0].strip()
-    
-    prompt = """Instruction-Following Judge (binary)
-
-Labels: A = good, B = bad
-Rules (succinct):
-- A if RESPONSE directly fulfills the INSTRUCTION, is correct (for factual asks), follows stated format/length, and is safe.
-- A if the INSTRUCTION is unsafe and the RESPONSE refuses briefly and (optionally) suggests safer alternatives.
-- Otherwise B. If uncertain, choose B.
-
-INSTRUCTION:
-{instruction}
-
-RESPONSE:
-{response}
-
-Output exactly one letter on the next line: A or B
-Label:""".format(instruction=instruction, response=clean_response)
-    
-    return prompt
-
-def get_token_logprobs(model, tokenizer, prompt, candidate_tokens):
-    """Get log probabilities for candidate tokens at the next position"""
-    
-    # Tokenize the prompt
-    inputs = tokenizer(prompt, return_tensors='pt', truncation=True, max_length=1600)
-    inputs = inputs.to(model.device)
-    
-    # Get model logits
-    with torch.no_grad():
-        outputs = model(**inputs)
-        logits = outputs.logits[0, -1, :]  # Last position logits
-    
-    # Convert to log probabilities
-    log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
-    
-    # Get log probabilities for candidate tokens
-    token_logprobs = {}
-    for token_text in candidate_tokens:
-        # Try different variations of token encoding
-        token_variations = [
-            token_text,
-            f" {token_text}",  # With leading space
-        ]
-        
-        best_logprob = float('-inf')
-        best_token_id = None
-        
-        for variation in token_variations:
-            try:
-                token_ids = tokenizer.encode(variation, add_special_tokens=False)
-                if len(token_ids) == 1:  # Single token
-                    token_id = token_ids[0]
-                    logprob = log_probs[token_id].item()
-                    if logprob > best_logprob:
-                        best_logprob = logprob
-                        best_token_id = token_id
-            except:
-                continue
-        
-        token_logprobs[token_text] = {
-            'logprob': best_logprob,
-            'token_id': best_token_id
-        }
-    
-    return token_logprobs
-
-def evaluate_with_logprobs(model, tokenizer, prompt, confidence_threshold=1.0):
-    """Evaluate using A/B log probabilities"""
-    
-    # Get log probabilities for A and B
-    candidate_tokens = ['A', 'B']
-    token_logprobs = get_token_logprobs(model, tokenizer, prompt, candidate_tokens)
-    
-    logp_a = token_logprobs['A']['logprob']
-    logp_b = token_logprobs['B']['logprob']
-    
-    # Choose the token with higher log probability
-    if logp_a > logp_b:
-        predicted_label = 'A'  # good
-        predicted_judgment = 'good'
-    else:
-        predicted_label = 'B'  # bad
-        predicted_judgment = 'bad'
-    
-    # Calculate confidence margin
-    margin = abs(logp_a - logp_b)
-    confident = margin > confidence_threshold
-    
-    return {
-        'predicted_label': predicted_label,
-        'predicted_judgment': predicted_judgment,
-        'logp_a': logp_a,
-        'logp_b': logp_b,
-        'margin': margin,
-        'confident': confident
-    }
-
-def load_model_with_retry(model_name, max_retries=2):
-    """Load model with retry logic"""
-    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-    
-    # Modern quantization config
-    bnb_config = BitsAndBytesConfig(
-        load_in_8bit=True,
-        llm_int8_threshold=6.0,
-        llm_int8_has_fp16_weight=False
-    )
-    
-    for attempt in range(max_retries):
-        try:
-            logger.info(f"Model loading attempt {attempt + 1}/{max_retries}")
-            
-            # Load tokenizer
-            logger.info("Loading tokenizer...")
-            tokenizer = AutoTokenizer.from_pretrained(
-                model_name, 
-                trust_remote_code=True,
-                use_fast=False
-            )
-            if tokenizer.pad_token is None:
-                tokenizer.pad_token = tokenizer.eos_token
-            logger.info("✅ Tokenizer loaded")
-            
-            # Load model
-            logger.info("Loading model with 8-bit quantization...")
-            model = AutoModelForCausalLM.from_pretrained(
-                model_name,
-                quantization_config=bnb_config,
-                device_map="auto",
-                trust_remote_code=True,
-                low_cpu_mem_usage=True,
-                torch_dtype=torch.float16
-            )
-            
-            logger.info(f"✅ Model loaded successfully")
-            logger.info(f"GPU memory: {torch.cuda.max_memory_allocated()/1e9:.1f}GB")
-            
-            return model, tokenizer
-            
-        except Exception as e:
-            logger.error(f"Model loading attempt {attempt + 1} failed: {e}")
-            if attempt < max_retries - 1:
-                logger.info("Clearing GPU cache and retrying...")
-                torch.cuda.empty_cache()
-                time.sleep(5)
-            else:
-                raise
+# REMOVED: Duplicate implementations now use shared utilities from instruction_critic
+# - create_ab_evaluation_prompt -> handled internally by critique_instruction_response_pair
+# - get_token_logprobs -> instruction_critic.get_token_logprobs
+# - evaluate_with_logprobs -> instruction_critic.critique_instruction_response_pair
+# - load_model_with_retry -> CleanModelLoader handles this safely
 
 def generate_bad_responses(instruction, inst_type, num_bad=2):
     """Generate obviously bad responses for contrast"""
@@ -247,9 +109,12 @@ def generate_preference_pairs():
     
     logger.info(f"📝 Loaded {len(responses)} initial responses")
     
-    # Load model
-    model_name = "Qwen/Qwen2.5-32B"
-    model, tokenizer = load_model_with_retry(model_name)
+    # Load model using CleanModelLoader (safe, prevents contamination)
+    model_path = os.environ.get('MODEL_PATH', 'Qwen/Qwen2.5-32B')
+    logger.info(f"Loading model: {model_path}")
+    loader = CleanModelLoader(model_path, load_in_8bit=True)
+    model, tokenizer, provenance = loader.load()
+    logger.info(f"✅ Model loaded with provenance: {provenance}")
     
     # Evaluate all responses
     evaluations = []
@@ -273,12 +138,22 @@ def generate_preference_pairs():
         instruction = resp_data['instruction']
         response = resp_data['response']
         inst_type = resp_data['instruction_type']
-        
-        # Create evaluation prompt
-        prompt = create_ab_evaluation_prompt(instruction, response)
-        
-        # Evaluate with log probabilities
-        eval_result = evaluate_with_logprobs(model, tokenizer, prompt, confidence_threshold)
+
+        # Use shared critic utility (consistent with v2 data generation)
+        critique = critique_instruction_response_pair(
+            model, tokenizer, instruction, response,
+            confidence_threshold=confidence_threshold
+        )
+
+        # Convert to expected format
+        eval_result = {
+            'predicted_label': critique['predicted_label'],
+            'predicted_judgment': 'good' if critique['is_good'] else 'bad',
+            'logp_a': critique['logp_a'],
+            'logp_b': critique['logp_b'],
+            'margin': critique['margin'],
+            'confident': critique['confident']
+        }
         
         # Store evaluation
         evaluation = {

@@ -69,11 +69,19 @@ class Stage1Pipeline:
     def run_python_script(self, script_name: str, args: list = None, step_name: str = None) -> bool:
         """Run a Python script and return success status"""
         script_path = self.scripts_dir / script_name
+
+        # Verify script exists before running (fail fast)
+        if not script_path.exists():
+            logger.error(f"❌ Script not found: {script_path}")
+            logger.error(f"   This may indicate the script was deprecated or renamed.")
+            logger.error(f"   Check docs/IMPLEMENTATION_REGISTRY.md for current scripts.")
+            return False
+
         cmd = [sys.executable, str(script_path)]
-        
+
         if args:
             cmd.extend(args)
-        
+
         logger.info(f"🏃 Running: {' '.join(cmd)}")
         
         # Different timeouts for different steps
@@ -193,14 +201,15 @@ class Stage1Pipeline:
         """Step 2: Generate training data"""
         step_name = "Data Generation"
         self.log_step(step_name, "start")
-        
+
         if not force and self.check_training_data_exists():
             logger.info("⏭️  Training data already exists, skipping...")
             self.log_step(step_name, "info", {"skipped": "already_exists"})
             return True
-        
+
+        # Use modern v2 script with model-generated instructions + quality filtering
         args = ["--count", str(num_instructions)]
-        success = self.run_python_script("generate_stage1_data.py", args, step_name="generate")
+        success = self.run_python_script("generate_sample_data_v2.py", args, step_name="generate")
         
         if success:
             # Load and log key results
@@ -231,8 +240,9 @@ class Stage1Pipeline:
             "--batch-size", str(batch_size),
             "--run-name", f"pipeline_{self.pipeline_start.strftime('%Y%m%d_%H%M%S')}"
         ]
-        
-        success = self.run_python_script("train_stage1_dpo.py", args, step_name="train")
+
+        # Use improved DPO trainer (uses CleanModelLoader)
+        success = self.run_python_script("train_stage1_dpo_improved.py", args, step_name="train")
         
         if success:
             checkpoint_path = self.find_latest_checkpoint()

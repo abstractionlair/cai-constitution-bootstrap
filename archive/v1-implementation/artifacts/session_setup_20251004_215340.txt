@@ -1,0 +1,25 @@
+RunPod Environment Setup
+========================
+
+Date: Sat Oct  4 21:53:40 UTC 2025
+Hostname: 12ced32cc6ce
+
+Git Information:
+  Branch: main
+  Commit: 3bb588f1422b62dd7fd472fd4f955d9161cc6475
+  Short:  3bb588f
+
+System:
+  Python: Python 3.12.3
+  PyTorch: 2.8.0+cu128
+  Transformers: 4.57.0
+  CUDA: 12.8
+
+GPU:
+0, NVIDIA H100 80GB HBM3, 81559 MiB, 81110 MiB
+1, NVIDIA H100 80GB HBM3, 81559 MiB, 81110 MiB
+
+Disk:
+mfs#ca-mtl-1.runpod.net:9421  972T  683T  290T  71% /workspace
+
+Setup complete: Sat Oct  4 21:53:48 UTC 2025
