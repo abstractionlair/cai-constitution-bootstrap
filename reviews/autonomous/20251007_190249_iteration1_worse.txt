@@ -1,0 +1,9 @@
+Decision: Try Option 2 (revert to pilot-1 sampling params and add explicit stop sequences) plus a quick Option 6 audit of the cleaning heuristics.
+
+Reasoning: Dropping both temperatures, tightening top_p, and raising repetition_penalty pushed the base model into low-entropy continuations. That collapsed the instruction distribution (24% acceptance) and produced long, deterministic list continuations that our runaway detector flags, hence the 54% runaway rate despite “tighter” decoding. The critics are reacting to degraded prompts rather than catching more noise; the shift happened upstream of QC, so the root cause is over-constraining sampling rather than thresholds themselves.
+
+Recommendation: For iteration 2 use `instruction_temp=0.70`, `instruction_top_p=0.90`, `instruction_rep_penalty=1.10`; `response_temp=0.40`, `response_top_p=0.90`, `response_rep_penalty=1.10`; `max_new_tokens=100` to ease residual limit hits. Add stop sequences such as `["\nInstruction", "\nQ:", "\n###", "\nUser:", "\nResponse:"]` to both generators so completions cut before starting a new prompt. Log 10 flagged “runaway” samples before/after cleaning to confirm the stop rules are firing and that heuristics aren’t over-trimming valid content.
+
+Priority: 1) Implement stop sequence handling and revert the decoding parameters; 2) run a 20–30 sample smoke test and inspect runaway examples to verify the cleaning audit; 3) if metrics normalize, rerun the full pilot.
+
+Alternative: If acceptance is still below 65% after these changes, move to Option 4 by enriching the instruction-generation few-shots (diversity + clear format cues) before touching QC thresholds or re-tightening decoding.

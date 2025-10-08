@@ -1,0 +1,8 @@
+Decision: SCALE  
+Reasoning: The corrected pilot clears every Stage 1 QC gate with comfortable margin (runaway 0%, acceptance >70%), and manual inspection plus prior iterations confirm the heuristic fix is behaving as intended. The generation plan stays far inside the cost envelope (~$21 vs $292 remaining) and uses the already validated parameter set, so the expected risk-to-reward favors scaling now.
+
+Concerns: Pilot sample is only 30 examples, below the spec’s 100–200 guidance, so keep an eye on metrics during the first shard to ensure the heuristic remains stable.
+
+Recommendations: 1. Re-run QC on the earlier 43-example batch with the updated heuristic to satisfy the 100+ sample expectation retroactively. 2. Log per-shard runaway and acceptance rates during scale; abort if any shard exceeds the thresholds. 3. Re-verify contamination sentinels at the start of the scaled run.
+
+Go/No-Go: GO
