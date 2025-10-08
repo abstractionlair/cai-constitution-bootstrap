@@ -375,6 +375,9 @@ Label:"""
 
         response = "\n".join(cleaned_lines)
 
+        # Remove any remaining ### markers (both ###END### and standalone ###)
+        response = response.replace('###END###', '').replace('###', '')
+
         # Final strip and cleanup
         return response.strip()
 

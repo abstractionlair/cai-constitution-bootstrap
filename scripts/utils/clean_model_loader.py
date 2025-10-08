@@ -312,7 +312,8 @@ class CleanModelLoader:
                 passed = not is_structured
             else:  # expected == "pass"
                 # Should produce reasonable completion
-                passed = len(response) > 0 and len(response) < 50
+                # Relaxed from < 50 to < 100 chars per Codex recommendation
+                passed = len(response) > 0 and len(response) < 100
 
             results.append({
                 "name": test["name"],

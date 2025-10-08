@@ -298,7 +298,8 @@ def main():
         # Pair critique
         pair_critique = critic.critique_pair(inst, response, confidence_threshold=1.0)
 
-        if pair_critique.is_good:
+        # Enforce confidence gate per spec (both is_good AND confident required)
+        if pair_critique.is_good and pair_critique.confident:
             pairs.append({
                 'instruction': inst,
                 'response': response,
