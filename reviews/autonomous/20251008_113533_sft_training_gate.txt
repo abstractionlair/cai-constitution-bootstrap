@@ -1,0 +1,19 @@
+Added gate review notes at `reviews/20251008_stage1_sft_training_gate_codex.md` documenting a NO-GO recommendation.
+
+**Key Findings**
+- `artifacts/scale/qc_summary_merged.json:30` still reports `thresholds_passed: false` with runaway_rate=34.7%, so the merged QC artifact violates the Stage 1 scale gate even though per-shard heuristics were fixed.
+- `data/stage1_sft_data.jsonl:1` shows `sentinel_tests_passed: false` for every record because the simple-completion sentinel fails; spec requires these contamination checks to pass before training.
+- Scripted inspection of `data/stage1_sft_data.jsonl` found only 1,311 unique instructions out of 3,968 (top item repeats 273×) and 1,510 responses still carry the literal `###` stop marker, indicating significant duplication and incomplete cleanup.
+- `data/test_instructions.jsonl:1` holds just 200 items (spec minimum ≥300) and three instructions overlap with the training set, so the planned McNemar evaluation lacks both power and clean separation.
+
+**Training/Eval Assessment**
+- Proposed QLoRA settings (LR 2e-4, r=16, 3 epochs, effective batch 8) are within spec defaults, but with ~1.3k unique prompts they risk overfitting once the data issues are addressed; consider lowering LR or epochs after the dataset is repaired.
+- Evaluation plan needs a larger, leakage-free holdout with paired deterministic decoding and BH-corrected per-type stats per `specs/stage1_evaluation_spec.md`.
+
+**Recommendation**
+- ❌ NO-GO: do not start Stage 1 SFT until the dataset is deduped/cleaned, sentinel checks pass, the merged QC manifest reflects the corrected heuristic, and the evaluation set meets sample-size and leakage requirements.
+
+**Next Steps**
+1. Re-run cleanup/dedup (strip `###`, add missing `instruction_critique`), regenerate QC with the fixed heuristic, and confirm sentinel tolerance settings.
+2. Generate additional/diverse shards (or relax the critic threshold) to reach ≥6–8k unique instructions before retraining.
+3. Expand the held-out set to ≥300 items with zero overlap, then revisit the SFT hyperparameters (possibly LR ≤1e-4 or ≤2 epochs) against the finalized dataset.

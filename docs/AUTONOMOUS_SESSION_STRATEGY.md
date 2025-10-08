@@ -330,16 +330,145 @@ Each phase is independent and can survive compaction.
 
 ---
 
+---
+
+## Context Management with Subagents
+
+**Key insight discovered**: The primary benefit of subagents is **keeping implementation details out of main context**, not just parallelization.
+
+### The Context Bloat Problem
+
+When implementing complex tasks directly, my context fills with:
+- Source code reads (100s-1000s of lines)
+- Implementation details (scripts, debugging)
+- Data analysis (inspection, counting, pattern matching)
+- Multiple iterations and refinements
+
+**Example from Stage 1 remediation**:
+- Task: Fix 5 data quality issues from Codex review
+- Direct implementation: ~60k tokens (code reads, script writing, analysis, testing)
+- With subagents: Would be ~15k tokens (task specs + summaries only)
+
+### When to Use Subagents for Context Management
+
+**Trigger points** - Use a subagent if task requires:
+1. Reading >500 lines of source code
+2. Writing >100 lines of new code
+3. Multiple rounds of data inspection/analysis
+4. Detailed debugging or investigation
+5. Complex multi-step implementation
+
+**Rule of thumb**: If you're thinking "this is getting detailed", spawn a subagent.
+
+### Pattern: Keep Main Context Clean
+
+```python
+# BAD: Direct implementation (bloats main context)
+read_file("scripts/utils/clean_model_loader.py")  # 425 lines → context
+analyze_sentinel_logic()  # analysis → context
+write_file("scripts/repair_data.py")  # 200 lines → context
+test_repair()  # test output → context
+# Main context now has 1000+ lines of implementation detail
+
+# GOOD: Subagent handles details
+spawn_subagent(
+    task="Fix sentinel test tolerance and repair data",
+    inputs=["data/stage1_sft_data.jsonl", "codex_review_findings.md"],
+    outputs=["data/stage1_sft_data_clean.jsonl", "repair_summary.md"]
+)
+# Subagent returns: "✅ Fixed. 1,120 clean examples, all sentinels passing."
+# Main context: Only the summary (1 line)
+```
+
+### Real Example: Stage 1 Remediation
+
+**What I did (direct implementation)**:
+```
+Main context consumption:
+├─ Sentinel investigation: 5k tokens (read CleanModelLoader, test logic)
+├─ Repair script implementation: 3k tokens (200 lines of code)
+├─ Duplication analysis: 8k tokens (data inspection, frequency counting)
+├─ QC recomputation: 2k tokens (script implementation)
+├─ Eval set expansion: 5k tokens (generation + filtering)
+└─ Documentation: 10k tokens
+
+Total: ~33k tokens on implementation details alone
+```
+
+**Better approach (with subagents)**:
+```
+Main context consumption:
+├─ Codex review: 2k tokens
+├─ Spawn Subagent A: "Fix data quality" (1k task spec)
+├─ Subagent A report: "✅ 1,120 clean examples" (0.5k)
+├─ Spawn Subagent B: "Expand eval set" (0.5k task spec)
+├─ Subagent B report: "✅ 343 test instructions" (0.3k)
+├─ Spawn Subagent C: "Generate shards" (0.5k task spec)
+└─ Subagent C status: "🔄 Generating..." (0.2k)
+
+Total: ~5k tokens (6× more efficient)
+```
+
+### Context Budget Strategy
+
+**For long autonomous sessions**, allocate context budget:
+
+```
+Target: 1M token limit
+Budget allocation:
+├─ Specs and documentation: 50k tokens (read once, reference)
+├─ Orchestration and planning: 50k tokens (main agent work)
+├─ User communication: 20k tokens
+├─ Subagent summaries: 30k tokens (reports from subagents)
+└─ Buffer: 850k tokens (safety margin)
+
+With subagents: Can coordinate 20-30 complex tasks before hitting limits
+Without subagents: Hit limits after 3-5 complex tasks
+```
+
+### When NOT to Use Subagents
+
+**Subagent overhead isn't worth it for**:
+1. Simple file edits (<50 lines)
+2. Quick analysis tasks (<10 min)
+3. Sequential dependencies where you need immediate feedback
+4. Tasks where you need to see the details (learning/debugging)
+
+**Use checkpoints instead** for fast linear workflows.
+
+### Lesson from This Session
+
+**Mistake**: Implemented 5 complex fixes directly without subagents
+- Filled context with implementation details
+- Still succeeded, but inefficient use of context budget
+
+**Better**: After Codex review identified 5 blockers, spawn 2-3 subagents:
+- Subagent A: Data quality fixes (5 hours of detailed work)
+- Subagent B: Eval set expansion (1 hour)
+- Subagent C: Additional shard generation (2 hours)
+
+**Result**: Main context stays focused on high-level orchestration and gate decisions, with 6× more headroom for additional work.
+
+---
+
 ## Summary
 
 **Key insight**: Since I can't control compaction timing, I need to make **every phase boundary a safe compaction point**.
 
-**Strategy**:
-1. Write checkpoints to files frequently
-2. Make each phase self-contained (load from files, not memory)
-3. Use incremental progress tracking
-4. Prefer streaming to files over accumulating in memory
+**Two complementary strategies**:
 
-**Result**: Compaction can happen anytime without disrupting work. I always know where I am by reading checkpoint files.
+### 1. Checkpoint Pattern (for linear workflows)
+- Write checkpoints to files frequently
+- Make each phase self-contained (load from files, not memory)
+- Use incremental progress tracking
+- Prefer streaming to files over accumulating in memory
+
+### 2. Subagent Pattern (for context management)
+- Spawn subagents for complex/detailed tasks
+- Keep main context focused on orchestration
+- Get back summaries, not implementation details
+- 5-10× more efficient context usage
+
+**Result**: Compaction can happen anytime without disrupting work. Context budget lasts 5-10× longer.
 
 **This makes autonomous work practical** even without manual compaction control.

@@ -1,0 +1,26 @@
+**Strategy Decisions**
+- **Strategy 2 – Diversity-Guided Prompts**: GO. Pilot 3×100-instruction shards to confirm duplicates fall below ~35%; leverage explicit “cover different topics” framing plus 7 negative examples and monitor critic margins to ensure no quality drift.
+- **Strategy 1 – Higher Temperature & Penalty**: GO (guarded). Move instruction temperature to 0.9 with rep_penalty 1.25–1.3 for upcoming shards, sample top_p=0.9, and compare QC + duplicate stats against the current 0.7 baseline before considering 1.0.
+- **Strategy 3 – Paraphrase Augmentation**: MODIFY. Defer until semantic coverage reaches ≥4–5k uniques; then cap paraphrase-derived items to ≤30% of the corpus and keep them flagged in manifests for ablation checks.
+- **Strategy 5 – Relax Critic Threshold**: MODIFY. Hold the 1.0 margin while fixing semantic diversity; if yield is still blocking after Strategies 1–2, experiment with 0.8–0.85 on instructions only, auditing random samples for factual slips before adopting.
+- **Strategy 4 – Best-of-N Responses**: NO-GO for Stage 1 SFT. Revisit once SFT model exists and we enter DPO prep—current bottleneck is instruction diversity, not response quality.
+
+**Diversity-Guided Guidance**
+- Base Qwen completions reliably continue numbered lists; adding “avoid repeating anything like items 1–7” plus topic hints (“cover STEM, creative writing, daily tasks, ethics…”) improves compliance without needing an instruction-tuned prior.
+- Keep the prompt compact: 6–7 exemplars, then ask for items 8–10; longer negative lists raise truncation risk and confuse parsing.
+- Expect duplication rate to drop from 67% toward 25–35% once you mix diversity-guided shards with higher-temperature shards; confirm via locality-sensitive hashing on instruction embeddings per shard.
+- Watch for meta-instructions (“Write another list”) slipping through; have the instruction critic reject them explicitly during the pilot.
+
+**Quality vs Quantity**
+- You can kick off an SFT pilot once you reach ~2k unique, fully-QC’d examples, but treat results as provisional; the Stage 1 spec still targets ~15k, so plan to continue generation in parallel.
+- Aim for 6–8k unique before committing to the scale SFT run; with 32B base and automated critics, that keeps variance manageable and supports later DPO data collection.
+- Maintain the current critic margin until duplicates, not critic rejections, become the main yield limiter; loosening the threshold early invites low-signal items that will slow SFT convergence.
+
+**Sequencing**
+- 1) Run a 3-shard diversity-guided pilot (Strategy 2) alongside a matched control shard at temperature 0.9 (Strategy 1); compare QC, duplicate rate, and critic margin distributions.  
+- 2) If diversity-guided shards outperform, fan out alternating diversity-guided and high-temp shards until you accumulate ~4k uniques.  
+- 3) Reassess yield; only then consider a carefully monitored critic-margin relaxation, and plan paraphrase augmentation as a follow-on batch tagged separately.
+
+**Next Steps**
+- Instrument the generation script to log per-shard duplication histograms and critic margin summaries so we can quantify gains from Strategies 1–2.  
+- Once ~2k uniques are confirmed, schedule the limited SFT pilot while continuing the generation campaign toward the 6–8k target.
