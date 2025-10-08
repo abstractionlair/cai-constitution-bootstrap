@@ -339,8 +339,22 @@ class Stage1ScaleGenerator:
         failed_reasons = []
         thresholds_passed = True
 
-        # Runaway rate (heuristic: responses with >200 chars or >3 sentences)
-        runaway_count = sum(1 for ex in examples if len(ex['response']) > 200 or ex['response'].count('.') > 3)
+        # Runaway rate (detect actual runaways: multiple Q/A pairs, not just long responses)
+        # Fixed heuristic: pattern-based detection, not length-based
+        runaway_patterns = [
+            '\n\nInstruction:',
+            '\n\nQuestion:',
+            '\n\nQ:',
+            '\nUser:',
+            '\nAssistant:',
+            '\nHuman:'
+        ]
+
+        runaway_count = sum(
+            1 for ex in examples
+            if any(pattern in ex['response'] for pattern in runaway_patterns)
+            or len(ex['response']) > 500  # Extremely long responses only
+        )
         runaway_rate = runaway_count / len(examples) if examples else 0
 
         if runaway_rate >= self.QC_THRESHOLDS['runaway_rate_max']:
