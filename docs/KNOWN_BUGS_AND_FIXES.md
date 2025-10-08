@@ -1,7 +1,78 @@
 # Known Bugs and Fixes
 
-**Last Updated**: 2025-10-04
+**Last Updated**: 2025-10-07
 **Purpose**: Document bugs discovered and their fixes to prevent regression
+
+---
+
+## 🚨 CRITICAL: Runaway Detection Heuristic Too Strict
+
+### The Bug
+**Discovered**: 2025-10-07 (during Stage 1 pilot iterations)
+**Status**: ✅ FIXED
+**File**: `generate_stage1_pilot_data.py:475-494`
+**Symptom**: QC reports 20-54% runaway rate despite 0% actual runaways
+
+### Root Cause
+Original heuristic flagged responses as "runaway" if:
+```python
+is_runaway = len(response) > 200 OR response.count('.') > 3
+```
+
+This incorrectly flagged **legitimate detailed explanations** as runaways!
+
+### Example of False Positive
+```
+Instruction: Explain the term 'ecosystem'.
+Response: "An ecosystem refers to a community of living organisms (plants,
+animals, microorganisms) interacting with each other and their physical
+environment (soil, water, air), forming a complex network of relationships
+that support life and maintain balance within an area or habitat."
+```
+- **Length**: 279 chars
+- **Old heuristic**: ❌ Runaway (len > 200)
+- **Reality**: ✅ Perfect detailed explanation
+
+### Impact
+- Iteration 1: Reported 53.8% runaway (actually 0%)
+- Iteration 2: Reported 46.7% runaway (actually 0%)
+- Same data, with fixed heuristic: 0.0% runaway ✅
+
+**Caused 2 failed iterations that would have passed with correct heuristic!**
+
+### The Fix
+Detect actual runaways (model generating new prompts/questions):
+```python
+# Detect patterns indicating new prompt generation
+runaway_patterns = [
+    '\n\nInstruction:',
+    '\n\nQuestion:',
+    '\n\nQ:',
+    '\nUser:',
+    '\nAssistant:',
+    '\nHuman:'
+]
+
+is_runaway = (
+    any(pattern in response for pattern in runaway_patterns)
+    or len(response) > 500  # Extremely long (not typical)
+)
+```
+
+### Why This Is Correct
+- Legitimate explanations can be 200-400 chars with 3-5 sentences
+- "Runaway" means model started generating new prompts, not just being thorough
+- Pattern detection is more accurate than length heuristics
+- 500 char limit catches truly excessive responses
+
+### Applied In
+- ✅ `generate_stage1_pilot_data.py:475-494` (2025-10-07)
+
+### Lesson Learned
+**Always validate QC metrics against actual examples!**
+- Metrics showed 46% "runaway"
+- Manual inspection: 0% actual runaways
+- Heuristic was measuring wrong thing
 
 ---
 
