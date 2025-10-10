@@ -280,7 +280,7 @@ def main():
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=100,
+                max_new_tokens=200,  # Increased from 100 to prevent truncation of code/detailed responses
                 temperature=0.4,
                 top_p=0.9,
                 repetition_penalty=1.1,

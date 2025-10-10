@@ -1,0 +1,13 @@
+⚠️ I’m stopping short of GO: the dataset still contains accepted pairs that fail to deliver the requested output. I left the full write-up in `reviews/20251010_stage1_sft_final_gate_codex.md`.
+
+- **Truncation failure (blocker)** – At least 66 responses end mid-sentence or just introduce code without the code itself (e.g. `data/stage1_sft_data_final.jsonl:517`, `:529`, `:3559`, `:5994`). These are genuine instruction-following failures that the critic missed; they’ll teach the SFT model to omit answers. Please drop or regenerate this slice, add a QC guard (e.g. flag responses ending with `:` or lacking content past the colon), and regenerate the QC summary before training.
+
+- **Stripped “True/False” prompts** – A handful of entries retain only the bare fact statement plus the label “True” (e.g. `data/stage1_sft_data_final.jsonl:61`, `:184`, `:462`). That likely came from cleaning away the “True or False:” prefix. Either restore the full instruction text or discard these few records while fixing the truncations.
+
+- **Median length question** – The spec’s QC code counts whitespace “tokens”; by that measure the dataset median is ≈34 words, so you’re inside the <40 gate. The 57-token figure you quoted comes from HF BPEs, which is fine but worth documenting so future reports don’t look like a gate failure.
+
+- **Training config** – Once the data fixes land, the proposed hyperparams (lr = 1e-4, 2 epochs, per_device=2 with grad_accum=4) are an appropriate starting point. Keep an eye on eval; if gains plateau after epoch 1, be ready to halve the LR or stop early.
+
+- **Pre-fix shards** – The repaired 300–311 seeds now look consistent (`repaired: true`, no delimiters, metadata intact). I’m OK leaving them in after the truncation cleanup, but mention that decision in the manifest for auditability.
+
+Next steps: (1) excise or regenerate the truncated/label-only rows and rerun QC; (2) add an automated check so the critic catches “intro-only” answers; (3) refresh the manifest with the cleaned counts, then ping me for a quick re-review so we can flip to GO.

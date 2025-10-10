@@ -500,9 +500,22 @@ class Stage1PilotGenerator:
             thresholds_passed = False
 
         # Delimiter leakage
-        delimiter_in_final = sum(1 for p in final_pairs if "###END###" in p['response'])
+        delimiter_in_final = sum(1 for p in final_pairs if "###END###" in p['response'] or "###" in p['response'])
         if delimiter_in_final > self.QC_THRESHOLDS['delimiter_leakage']:
             failed_reasons.append(f"Delimiter leakage: {delimiter_in_final} occurrences in final responses")
+            thresholds_passed = False
+
+        # Completeness check (detect truncated/incomplete responses)
+        truncated_responses = sum(
+            1 for p in final_pairs
+            if (p['response'].strip().endswith(':') or  # Code intro without code
+                p['response'].strip() in ['True', 'False', 'True.', 'False.'] or  # Bare boolean
+                (len(p['response'].strip()) < 10 and p['response'].strip() not in ['Yes', 'No', 'Yes.', 'No.']))  # Too short
+        )
+        truncation_rate = truncated_responses / len(final_pairs) if final_pairs else 0
+        # Add to QC thresholds (allow up to 2% truncation)
+        if truncation_rate > 0.02:
+            failed_reasons.append(f"Truncation rate {truncation_rate:.1%} > 2.0%")
             thresholds_passed = False
 
         # Median tokens
@@ -539,7 +552,9 @@ class Stage1PilotGenerator:
             "pair_acceptance": pair_acceptance,
             "runaway_rate": runaway_rate,
             "token_limit_rate": token_limit_rate,
-            "delimiter_leakage_count": delimiter_in_final
+            "delimiter_leakage_count": delimiter_in_final,
+            "truncation_rate": truncation_rate,
+            "truncated_count": truncated_responses
         }
 
         logger.info(f"✅ QC metrics computed")
@@ -561,7 +576,7 @@ class Stage1PilotGenerator:
         response_temperature: float = 0.4,
         response_top_p: float = 0.9,
         response_repetition_penalty: float = 1.1,
-        response_max_tokens: int = 80,
+        response_max_tokens: int = 200,  # Increased from 80 to prevent truncation
         confidence_threshold: float = 1.0
     ) -> Dict[str, Path]:
         """
@@ -823,8 +838,8 @@ def main():
     parser.add_argument(
         "--response-max-tokens",
         type=int,
-        default=80,
-        help="Max new tokens for response generation (default: 80)"
+        default=200,
+        help="Max new tokens for response generation (default: 200, increased to prevent truncation)"
     )
     parser.add_argument(
         "--confidence-threshold",
