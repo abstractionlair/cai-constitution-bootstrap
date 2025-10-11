@@ -1,0 +1,12 @@
+**Assessment**
+- Stage 1 is scoped to data that teaches explicit instruction following; the spec defines “good” instructions as clear directives the model can act on (`specs/stage_1_explicit_instructions.md:3` and `specs/stage1_data_generation_spec.md:29-34`). 
+- Bare factual statements lack any directive surface form, so they land in the Stage 4 “evaluation tasks” bucket called out separately in the roadmap (`README.md:17-21`).
+
+**Decisions**
+- Q1: These True/False judgement items are out of scope for Stage 1 SFT and should not ship in the Stage 1 dataset.
+- Q2: Not applicable once we exclude them; if we later want binary judgements in Stage 1 they must be phrased as explicit instructions (“Determine whether…”) before generation.
+- Q3: Add a QC drop rule that rejects pairs where (a) the response is `{"True","False","True.","False."}` and (b) the instruction lacks an explicit evaluation cue such as “True or False”, “Is”, “Determine whether”, or a question mark. That keeps genuine short answers when the prompt is directive, while stripping these statement→label completions. Log any rejected examples so they can be banked for Stage 4.
+
+**Next Steps**
+1. Implement the QC filter (post pair-critic) and note the rule in the QC summary manifest.
+2. Stash filtered examples in a separate Stage 4 scratch file for future use.

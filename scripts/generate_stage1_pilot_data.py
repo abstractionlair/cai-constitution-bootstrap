@@ -505,12 +505,39 @@ class Stage1PilotGenerator:
             failed_reasons.append(f"Delimiter leakage: {delimiter_in_final} occurrences in final responses")
             thresholds_passed = False
 
+        # Filter out-of-scope True/False evaluation tasks (Stage 4, not Stage 1)
+        # Per Codex: Bare statements → True/False are evaluation tasks, not instruction-following
+        def is_true_false_evaluation(instruction: str, response: str) -> bool:
+            """Check if this is a True/False evaluation task (out of scope for Stage 1)."""
+            resp = response.strip()
+            inst_lower = instruction.lower()
+
+            # Response is True/False
+            if resp not in ['True', 'False', 'True.', 'False.']:
+                return False
+
+            # AND instruction lacks directive cues (it's a bare statement)
+            directive_cues = ['true or false', 'is this', 'determine whether', '?']
+            has_directive = any(cue in inst_lower for cue in directive_cues)
+
+            return not has_directive  # Out of scope if no directive
+
+        # Separate Stage 4 examples
+        stage4_examples = [p for p in final_pairs if is_true_false_evaluation(p['instruction'], p['response'])]
+
+        # Filter to Stage 1 only
+        final_pairs_stage1 = [p for p in final_pairs if not is_true_false_evaluation(p['instruction'], p['response'])]
+
+        logger.info(f"Filtered {len(stage4_examples)} True/False evaluation tasks (Stage 4, not Stage 1)")
+
+        # Update final_pairs to only include Stage 1
+        final_pairs = final_pairs_stage1
+
         # Completeness check (detect truncated/incomplete responses)
         truncated_responses = sum(
             1 for p in final_pairs
             if (p['response'].strip().endswith(':') or  # Code intro without code
-                p['response'].strip() in ['True', 'False', 'True.', 'False.'] or  # Bare boolean
-                (len(p['response'].strip()) < 10 and p['response'].strip() not in ['Yes', 'No', 'Yes.', 'No.']))  # Too short
+                (len(p['response'].strip()) < 10 and p['response'].strip() not in ['Yes', 'No', 'Yes.', 'No.']))  # Too short (excluding valid short answers)
         )
         truncation_rate = truncated_responses / len(final_pairs) if final_pairs else 0
         # Add to QC thresholds (allow up to 2% truncation)
