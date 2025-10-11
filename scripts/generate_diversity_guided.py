@@ -298,6 +298,28 @@ def main():
         # Pair critique
         pair_critique = critic.critique_pair(inst, response, confidence_threshold=1.0)
 
+        # Scope filtering: Check if this is Stage 1 appropriate
+        def is_true_false_evaluation(instruction: str, response: str) -> bool:
+            """Check if this is a True/False evaluation task (Stage 4, not Stage 1)."""
+            resp = response.strip()
+            inst_lower = instruction.lower()
+            if resp not in ['True', 'False', 'True.', 'False.']:
+                return False
+            directive_cues = ['true or false', 'is this', 'is it', 'determine whether', '?']
+            has_directive = any(cue in inst_lower for cue in directive_cues)
+            return not has_directive
+
+        def is_truncated(response: str) -> bool:
+            """Check if response appears truncated."""
+            resp = response.strip()
+            return resp.endswith(':') or (len(resp) < 10 and resp not in ['Yes', 'No', 'Yes.', 'No.'])
+
+        # Skip if out of scope or truncated
+        if is_true_false_evaluation(inst, response):
+            continue  # Stage 4 task, not Stage 1
+        if is_truncated(response):
+            continue  # Quality issue
+
         # Enforce confidence gate per spec (both is_good AND confident required)
         if pair_critique.is_good and pair_critique.confident:
             pairs.append({
