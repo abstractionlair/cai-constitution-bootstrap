@@ -312,7 +312,18 @@ def main():
         def is_truncated(response: str) -> bool:
             """Check if response appears truncated."""
             resp = response.strip()
-            return resp.endswith(':') or (len(resp) < 10 and resp not in ['Yes', 'No', 'Yes.', 'No.'])
+            # Ends with : (code intro without code)
+            if resp.endswith(':'):
+                return True
+            # Ends with numbered/bulleted list item followed by hyphen (incomplete list)
+            # E.g., "5) Biomass Energy -" or "7. Professionalism -"
+            import re
+            if re.search(r'[\d\)\.]\s+\w+(\s+\w+)*\s*-\s*$', resp):
+                return True
+            # Very short without being a valid short answer
+            if len(resp) < 10 and resp not in ['Yes', 'No', 'Yes.', 'No.']:
+                return True
+            return False
 
         # Skip if out of scope or truncated
         if is_true_false_evaluation(inst, response):

@@ -1,0 +1,21 @@
+**GO Decision**
+- GO to begin Stage 1 SFT training; both prior blockers are cleared and current QC metrics meet spec.
+
+**Key Checks**
+- Confirmed 300 unique eval prompts with zero train overlap via scripted audit of `data/test_instructions_clean.jsonl`, matching the spec minimum and leakage guard.
+- Re-ran the updated truncation detector across `data/stage1_sft_data_final_clean.jsonl`; no responses end with bare hyphen tails, colons, or ultra-short fragments after removing the two flagged rows.
+- Verified the regex-based truncation guard now lives in both generation paths (`scripts/generate_stage1_pilot_data.py:654`, `scripts/generate_diversity_guided.py:312`), so future data runs will catch the earlier miss.
+- Noted the training pool still contains clusters of duplicate prompts (max 13 copies); safe for this run but worth smoothing in later refreshes.
+
+**Answers**
+- Q1: Yes—duplicate hold-outs eliminated and the truncation detector now flags the list-tail pattern; the cleaned artifacts validate both fixes.
+- Q2: Yes—5,467 examples preserve the intended scale, and dropping two truncated pairs is immaterial for learning dynamics.
+- Q3: Yes—the new regex covers numbered/bulleted hyphen tails while avoiding false positives in full sentences; no residual truncations detected.
+- Q4: No new blockers; only optional follow-up is to de-duplicate high-frequency instructions when regenerating data for subsequent stages.
+
+**Artifacts**
+- Filed full review at `reviews/20251013_stage1_sft_final_gate_codex.md`.
+
+**Next Steps**
+1. Launch the SFT run with the posted hyperparameters, capturing the training manifest and QC summaries.
+2. After training, execute the deterministic eval + McNemar analysis to satisfy the Stage 1 training gate.

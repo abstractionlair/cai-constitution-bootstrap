@@ -49,7 +49,8 @@ def load_existing_test_instructions(path: Path) -> List[Dict[str, Any]]:
 
 
 def generate_test_instructions(
-    loader: CleanModelLoader,
+    model,
+    tokenizer,
     prompts: CompletionStylePrompts,
     num_to_generate: int,
     excluded: Set[str],
@@ -59,7 +60,8 @@ def generate_test_instructions(
     Generate new test instructions ensuring no overlap with training.
 
     Args:
-        loader: CleanModelLoader instance
+        model: Loaded model instance
+        tokenizer: Loaded tokenizer instance
         prompts: CompletionStylePrompts instance
         num_to_generate: Number of instructions to generate
         excluded: Set of instructions to exclude (training set)
@@ -95,21 +97,17 @@ def generate_test_instructions(
         # Generate instruction using loader's generation method
         prompt = prompts.create_instruction_generation_prompt()
 
-        # Use loader's internal tokenizer and model
-        from transformers import AutoTokenizer
+        # Use model and tokenizer passed in
         import torch
-
-        tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-32B")
-        tokenizer.chat_template = None
 
         inputs = tokenizer(
             prompt,
             add_special_tokens=False,
             return_tensors="pt"
-        ).to(loader.model.device)
+        ).to(model.device)
 
         with torch.no_grad():
-            outputs = loader.model.generate(
+            outputs = model.generate(
                 **inputs,
                 max_new_tokens=150,
                 temperature=0.8,  # Higher temperature for diversity
@@ -225,6 +223,7 @@ def main():
         model_name="Qwen/Qwen2.5-32B",
         load_in_4bit=True
     )
+    model, tokenizer, provenance = loader.load()
     prompts = CompletionStylePrompts()
 
     # Step 6: Generate new instructions
@@ -236,7 +235,8 @@ def main():
         excluded.add(inst['instruction'].strip().lower())
 
     new_instructions = generate_test_instructions(
-        loader=loader,
+        model=model,
+        tokenizer=tokenizer,
         prompts=prompts,
         num_to_generate=needed,
         excluded=excluded,

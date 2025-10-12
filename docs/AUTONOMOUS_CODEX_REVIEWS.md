@@ -205,6 +205,90 @@ else:
 
 ---
 
+## Actual Usage Pattern
+
+The `codex` CLI tool accepts file input. The pattern is:
+
+```bash
+# 1. Write detailed review request to temp file
+cat > /tmp/review_prompt.txt << 'EOF'
+# CODEX REVIEW REQUEST: [Topic]
+
+## Context
+[Background and project context]
+
+## Current State
+[What's been done, metrics, findings]
+
+## Proposed Approach
+[What I'm planning to do]
+
+## Review Questions
+1. Question 1...
+2. Question 2...
+
+## Request
+GO / NO-GO / MODIFY for [decision]?
+EOF
+
+# 2. Send to Codex and save response
+codex /tmp/review_prompt.txt > reviews/autonomous/$(date +%Y%m%d_%H%M%S)_topic.txt
+
+# 3. Read and act on response
+cat reviews/autonomous/[newest_file].txt
+```
+
+### Real Example from This Project
+
+```bash
+cat > /tmp/sft_review_prompt.txt << 'EOF'
+# CODEX REVIEW REQUEST: Stage 1 SFT Training Readiness Gate
+
+## Context
+You are reviewing the Stage 1 SFT training plan for a Constitutional AI Bootstrap experiment. This is a HIGH-STAKES GATE DECISION that will commit ~$6 and 2 hours of GPU time.
+
+## Current State
+
+### Data Generation Complete
+- **Dataset**: 3,968 instruction-response pairs in `data/stage1_sft_data.jsonl`
+- **Generation method**: 10 shards (seeds 100-109), pilot-validated parameters
+- **QC Status**: PASS with corrected runaway heuristic
+  - Runaway rate: 0.9% (vs 5.0% threshold)
+  - Token limit hits: 0.0% (vs 10.0% threshold)
+
+## Proposed SFT Training Plan
+
+### Training Configuration
+```python
+base_model = "Qwen/Qwen2.5-32B"
+quantization = "4bit"  # QLoRA
+learning_rate = 2e-4
+num_epochs = 3
+per_device_train_batch_size = 2
+```
+
+## Review Questions
+
+1. Is 3,968 examples sufficient for Stage 1 SFT training?
+2. Are training hyperparameters appropriate?
+3. Should we adjust any configuration parameters?
+
+## Request
+
+GO / NO-GO / MODIFY for starting SFT training with current configuration?
+EOF
+
+codex /tmp/sft_review_prompt.txt > reviews/autonomous/$(date +%Y%m%d_%H%M%S)_sft_training_gate.txt
+```
+
+### Key Format Elements
+
+1. **Clear header**: `# CODEX REVIEW REQUEST: [Topic]`
+2. **Structured sections**: Context → Current State → Proposed Approach → Review Questions → Request
+3. **Explicit decision format**: "GO / NO-GO / MODIFY"
+4. **Timestamped output**: `$(date +%Y%m%d_%H%M%S)_topic.txt`
+5. **Saved to audit trail**: `reviews/autonomous/` directory
+
 ## Configuration on Pod
 
 ### 1. Ensure Codex is Authenticated
@@ -214,7 +298,7 @@ else:
 codex login
 
 # Test it works
-codex exec "What is 2+2?"
+codex /tmp/test.txt
 ```
 
 ### 2. Set Environment Variables

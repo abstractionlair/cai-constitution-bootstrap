@@ -1,0 +1,7 @@
+Documented the methodology review in `reviews/20251012_test_set_size_codex.md`.
+
+- Stage 1 SFT spec still mandates a ≥300-item deterministic subset when not using the full 800–1200 hold-out; 136 items stays non-compliant (`specs/stage1_sft_spec.md:35`).
+- Evaluation spec assumes enough coverage per category for BH-adjusted paired stats, which a 136-item pool can’t deliver (`specs/stage1_evaluation_spec.md:11`, `specs/stage1_evaluation_spec.md:20`), risking meaningless CIs and p-values.
+- With N=136 the continuity-corrected McNemar test struggles to hit p<0.01 unless discordant counts are extreme, so powering the SFT gate or any later SFT→DPO comparison would be brittle.
+
+Please proceed with option B: generate additional clean instructions to reach ≥300 unique test items, then refresh the leakage audit and manifest.

@@ -1,0 +1,15 @@
+Filed the full review in `reviews/20251011_stage1_sft_final_gate_codex.md`.
+
+⚠️ MODIFY – Two gating issues still block the Stage 1 SFT run:
+- `data/test_instructions_clean.jsonl:130` (also 192, 291, 298, 332) repeats the same prompt five times, and that instruction already lives in the training set (`data/stage1_sft_data_final_clean.jsonl:3327`). The hold-out now has only 137 unique prompts, so a handful of templates would dominate the McNemar test and the spec’s zero-leakage guarantee is broken.
+- `data/stage1_sft_data_final_clean.jsonl:4025` and `data/stage1_sft_data_final_clean.jsonl:4611` still terminate mid-list (“Biomass Energy -”, “Professionalism -”), meaning the new truncation detector is missing list endings. The QC report claiming 0 truncated examples is therefore optimistic.
+
+Responses to your questions:
+1. Data quality: overall good coverage and metadata, but please excise or regenerate the truncated list items and tighten the Phase 3b truncation check so future shards can’t sneak this pattern through.
+2. Training config: the proposed LoRA hyperparameters look appropriate once the dataset/eval fixes land. Just keep masking on response tokens per the spec.
+3. Scope filtering: no residual True/False items surfaced, so the Phase 3b filter seems to be doing its job.
+4. Evaluation plan: not ready. Deduplicate and expand the held-out set to ≥300 unique items, rerun the leakage audit against the training JSONL, and regenerate the evaluation manifest before relying on the McNemar gate.
+
+Next steps:
+1. Refresh the held-out evaluation file, rerun leakage/dedup checks, and update the manifest.
+2. Patch the truncation heuristic to catch list bullets ending in bare hyphens/colons, drop or regenerate the affected rows, and rerun QC.

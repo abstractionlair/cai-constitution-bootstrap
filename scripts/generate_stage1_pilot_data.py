@@ -657,6 +657,11 @@ class Stage1PilotGenerator:
             # Ends with : (code intro without code)
             if resp.endswith(':'):
                 return True
+            # Ends with numbered/bulleted list item followed by hyphen (incomplete list)
+            # E.g., "5) Biomass Energy -" or "7. Professionalism -"
+            import re
+            if re.search(r'[\d\)\.]\s+\w+(\s+\w+)*\s*-\s*$', resp):
+                return True
             # Very short without being a valid short answer
             if len(resp) < 10 and resp not in ['Yes', 'No', 'Yes.', 'No.', 'True', 'False', 'True.', 'False.']:
                 return True
