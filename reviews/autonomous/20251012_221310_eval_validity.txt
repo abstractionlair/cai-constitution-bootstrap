@@ -1,0 +1,9 @@
+**Stage 1 Eval Review**
+- Current scoring caps “success” at 500 chars, so compliant long-form answers are tagged failures and the reported 18.3% lift mostly reflects shorter generations, not better instruction following (scripts/evaluate_stage1_sft.py:226).
+- Success labels never check factual/format accuracy, allowing wrong answers through; all downstream rates, Wilson CIs, and McNemar p=2.06×10⁻¹² are therefore meaningless (specs/stage1_evaluation_spec.md:24).
+- Base-model behaviour flips between sentinel prompts and `"Instruction: …\nResponse:"` evaluation prompts, so you must isolate the prompt-format effect before attributing gains to SFT (docs/BASE_MODEL_TRUTH.md:6, specs/stage1_evaluation_spec.md:14).
+- Full findings and recommendations are in `reviews/responses/20251012_stage1_evaluation_validity_codex.md`; Stage 1 gate stays blocked until the evaluation is rerun with corrected scoring.
+
+Recommended next steps:
+1. Replace the heuristic with a judge that verifies instruction compliance (e.g., pair critic with margin threshold or deterministic LLM judge), validate on a human-calibrated sample, and rerun the eval for base (raw vs wrapper) and SFT conditions.
+2. Regenerate success labels, recompute paired stats per spec (including BH corrections), update manifests with scoring/prompt details, and only revisit Stage 2 after a clean McNemar pass (p<0.01) with no safety regressions.

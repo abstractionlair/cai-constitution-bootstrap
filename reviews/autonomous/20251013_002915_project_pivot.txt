@@ -1,0 +1,7 @@
+- Review filed at `reviews/responses/20251013_stage1_conversation_pivot_codex.md:1` with a ⚠️ MODIFY decision—conversation ability is a viable target, but only after a formal spec, validated gap, and hardened scoring plan are in place.
+- Flagged high-severity needs: write a dedicated conversation-eval spec with prompt/turn contracts and statistical gates; lock an LLM-judge + heuristic scoring pipeline with human calibration; validate the gap via the proposed three-way pilot plus an alternate base model sanity check.
+- Offered supporting suggestions: document the newly observed instruction-following behavior, engineer conversation templates with traceable state slots, gather manual calibration data, and keep lightweight probes for other capabilities as contingency.
+
+Next steps:
+1. Draft the Stage 1B conversation evaluation spec and route it for sign-off.
+2. Prototype the 3-way + alternate-base pilot and judge rubric on ~30 conversations to verify the capability gap before scaling further.

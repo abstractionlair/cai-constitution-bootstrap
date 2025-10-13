@@ -40,7 +40,7 @@ import torch
 from datasets import load_dataset
 from transformers import TrainingArguments
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-from trl import SFTTrainer
+from trl import SFTTrainer, SFTConfig
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -272,8 +272,8 @@ class Stage1SFTTrainer:
         """
         logger.info("Starting SFT training...")
 
-        # Training arguments
-        training_args = TrainingArguments(
+        # Training arguments with SFT-specific config
+        training_args = SFTConfig(
             output_dir=str(self.output_dir),
             num_train_epochs=epochs,
             per_device_train_batch_size=batch_size,
@@ -289,7 +289,9 @@ class Stage1SFTTrainer:
             optim="paged_adamw_8bit",  # Memory-efficient optimizer
             logging_dir=str(self.output_dir / "logs"),
             report_to=[],  # Disable reporting
-            remove_unused_columns=False
+            remove_unused_columns=False,
+            max_length=max_seq_length,  # SFT-specific: max sequence length
+            dataset_text_field="text"  # Will be populated by formatting_func
         )
 
         # Format function for SFT
@@ -304,10 +306,8 @@ class Stage1SFTTrainer:
             model=self.model,
             args=training_args,
             train_dataset=dataset,
-            tokenizer=self.tokenizer,
-            max_seq_length=max_seq_length,
-            formatting_func=formatting_func,
-            packing=False  # Don't pack sequences
+            processing_class=self.tokenizer,  # Updated parameter name in TRL 0.23+
+            formatting_func=formatting_func
         )
 
         logger.info(f"✅ Trainer configured")

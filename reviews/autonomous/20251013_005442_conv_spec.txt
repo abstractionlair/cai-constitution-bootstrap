@@ -1,0 +1,15 @@
+⚠️ MODIFY – Solid framing and gates, but scoring and the raw-baseline setup need tightening before this can stand as the Stage 1B benchmark.
+
+- 🚨 CRITICAL: The automated heuristics as written (specs/stage1b_conversation_eval_spec.md:200, specs/stage1b_conversation_eval_spec.md:381) only check a few surface lexical patterns, yet conversation categories demand richer reasoning; requiring perfect agreement with the LLM judge (specs/stage1b_conversation_eval_spec.md:247) will misclassify many valid conversations and make the ≥80 % agreement gate unattainable. Either constrain every conversation to a templated, machine-checkable schema and store those expectations, or demote heuristics to diagnostics with human audit of disagreements.
+- ⚠️ HIGH: The “base-raw” prompt path lacks a concrete turn-by-turn transcript recipe (specs/stage1b_conversation_eval_spec.md:278, specs/stage1b_conversation_eval_spec.md:479) even though the multi-turn format earlier assumes `User:`/`Assistant:` alternation (specs/stage1b_conversation_eval_spec.md:153). Without explicit delimiters and a shared generation loop, the raw baseline may not face the same task, undermining the capability-gap claim.
+
+💡 Suggestions  
+- Keep `User:`/`Assistant:` markers for every evaluated run; the raw baseline can omit extra helper text but still needs consistent separators and the same iterative generation loop, with CleanModelLoader enforcing completion mode and `add_special_tokens=False`.  
+- Treat heuristics as triage: require ≤10 % disagreement with the judge, then audit by hand; if you need them as gates, template each scenario and encode acceptable entities/ingredients alongside the data.  
+- Claude 3.5 Sonnet is an efficient primary judge; spot-check ~10 % with GPT-4. Recompute κ on the 30-item calibration set every run.  
+- A 30–40 conversation pilot is fine; document that 200 paired samples with p₁≈0.3 vs p₂≈0.8 give >0.99 McNemar power at α=0.01 and ~0.12 Wilson half-width per category (~50 items each).  
+- Use Llama 3.1 8B as the alternate base first; add Mistral 7B only if the sanity check is ambiguous.
+
+Stored full review at `reviews/responses/20251013_stage1b_conversation_eval_codex.md`.
+
+Next steps: rework the scoring/gating logic and transcript specification, then resubmit for review.
