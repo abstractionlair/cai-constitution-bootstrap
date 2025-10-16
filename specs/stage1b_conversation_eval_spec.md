@@ -1,6 +1,6 @@
 # Stage 1B: Conversation Ability Evaluation Spec
 
-**Status**: DRAFT v2 (incorporating Codex feedback from 2025-10-13)
+**Status**: DRAFT v3 (tightened gates and baselines)
 **Created**: 2025-10-13
 **Last Updated**: 2025-10-13
 **Purpose**: Evaluate multi-turn conversation ability to identify genuine capability gap between base and Instruct models
@@ -46,9 +46,9 @@ Stage 1 targeted "explicit instruction-following" but discovered:
 
 ### Test Set Structure
 
-**Size**: 200 multi-turn conversations (required for statistical power)
-- **Power analysis**: 200 paired samples with p₁≈0.3 vs p₂≈0.8 gives >0.99 McNemar power at α=0.01
-- **Per-category**: ~50 conversations each → Wilson CI half-width ≈0.12 (acceptable)
+**Size (full benchmark)**: ≥ 300 multi-turn conversations
+- **Power analysis**: 300 paired samples with p₁≈0.3 vs p₂≈0.8 retains >0.99 McNemar power at α=0.01 and strengthens per-category analysis
+- **Per-category**: ≥ 75 conversations each → tighter Wilson CIs and meaningful BH-adjusted per-category tests
 
 **Conversation structure**: Each conversation has 3-5 turns
 - **Turn 1**: Initial user message (establishes context)
@@ -237,7 +237,18 @@ User: What subject do I study?
 Assistant: {model_generates_turn_3}
 ```
 
-**Note**: All four model conditions use identical format. The "raw" vs "formatted" distinction from earlier analysis is no longer applicable - all conditions use "User:"/"Assistant:" labels to ensure well-defined multi-turn task.
+**Note**: Decoding parameters are identical across conditions. We intentionally include a minimal-scaffolding "base-raw" ablation (see Baselines) to quantify format effects separately from training effects; other conditions use the `User:`/`Assistant:` transcript.
+
+---
+
+## Contamination Guards & Provenance (Required)
+
+All evaluations MUST comply with `specs/CONTAMINATION_GUARD_SPEC.md`:
+
+- Load base models via `CleanModelLoader`; ensure `tokenizer.chat_template=None` and `add_special_tokens=False`.
+- Token-ID delta check on sentinel prompts; abort if any delta indicates template injection.
+- Run base-model sentinel tests and log outcomes.
+- Record provenance in the evaluation manifest: `loader_version`, `template_disabled: true`, `add_special_tokens: false`, `sentinel_tests_passed: true`, environment versions, SHAs, decoding params.
 
 ---
 
@@ -318,6 +329,18 @@ Output format:
 
 **Judge decision**: Conversation passes if ALL turns pass
 
+#### Single-Token Variant (Optional, for margin analysis)
+
+To enable single-token margin analysis and reduce parsing variance, prepend a one-line label request. The judge decides based on the rubric but outputs the overall decision as a single token immediately after `Label:`:
+
+```
+Decide if the assistant demonstrated multi-turn conversation ability.
+Output exactly one letter on the next line: A = PASS, B = FAIL
+Label:
+```
+
+Then include the structured JSON for auditability. When used, compute logprobs for next token on `"A"` vs `"B"` to derive judge margin.
+
 ### Final Score Reconciliation
 
 **Conversation marked SUCCESS based on**:
@@ -356,10 +379,17 @@ Output format:
 
 ### Models to Test
 
-1. **Base model - Raw prompts**
+1. **Base model — Raw (minimal scaffolding)**
    - Model: Qwen/Qwen2.5-32B
-   - Format: Just the conversation turns, no "User:"/"Assistant:" labels
-   - Purpose: True baseline without any formatting help
+   - Format: Concatenate turns without `User:`/`Assistant:` labels. Use plain newlines between utterances; append `Assistant:` only before the generation position to mark who speaks next.
+   - Example:
+     ```
+     My name is Alice.
+     [assistant_response_turn_1]
+     What's my name?
+     Assistant:
+     ```
+   - Purpose: Quantify format effects separately from training effects
 
 2. **Base model - Formatted prompts**
    - Model: Qwen/Qwen2.5-32B
@@ -396,27 +426,21 @@ Output format:
 
 ---
 
-## Pilot Size & Statistics
+## Pilot Sampling & Statistics
 
 ### Pilot Phase (Before Full Benchmark)
 
-**Size**: 30-40 conversations
-- Enough to detect large effects
-- Fast to run (< 1 hour per model)
-- Validates evaluation methodology
-
-**Purpose**:
-- Verify gap exists
-- Calibrate scoring methods
-- Estimate variance for power analysis
-- Get user confirmation
+**Pilot size**: 40 conversations total (10 per category)
+- Balanced across: Explicit Memory, Preference Tracking, Topic Continuity, Constraint Updates
+- Models: Base-raw, Base-formatted, Instruct-formatted (Alt-base optional for pilot)
+- Purpose: Verify gap, validate scoring, estimate variance, confirm rubric fidelity
 
 ### Full Benchmark (Only After Pilot Passes)
 
-**Size**: 150-200 conversations
+**Size**: ≥ 300 conversations
+- ≥ 75 per category for robust per-category stats
 - Powered for h ≥ 0.5 with α = 0.01
-- Enables per-category analysis
-- Sufficient for McNemar test
+- Benjamini–Hochberg correction (FDR=0.10) across category tests
 
 ---
 
@@ -647,7 +671,7 @@ Assistant:
 **Base-formatted vs Alt-base-formatted**: Tests if Qwen is special
 **Per-category analysis**: Memory, preferences, continuity, constraints
 
-**Multiple testing correction**: Benjamini-Hochberg (FDR = 0.10) for category comparisons
+**Multiple testing correction**: Benjamini–Hochberg (FDR = 0.10) for category comparisons; report adjusted p-values and `significant_after_bh`
 
 ---
 
@@ -688,6 +712,9 @@ Assistant:
    - Alt-base success rate: ≤ 40%
    - Confirms Qwen base isn't uniquely capable
 
+9. **Per-category robustness**
+   - After BH correction (FDR=0.10), at least 3/4 categories significant (adjusted p < 0.10)
+
 ### Abort Conditions
 
 **Do NOT proceed to training if**:
@@ -717,7 +744,7 @@ Assistant:
   - McNemar test results (chi2, p-value, discordant pairs)
   - Cohen's h effect sizes
   - Per-category breakdowns
-  - Benjamini-Hochberg adjusted p-values
+  - Benjamini–Hochberg adjusted p-values and `significant_after_bh`
 
 **Human-readable summary**:
 - `results/conversation_eval/evaluation_summary.txt`
@@ -733,6 +760,7 @@ Every evaluation artifact must include:
 - Decoding parameters (temperature, seed, max_tokens)
 - Scoring method details (heuristic version, judge model)
 - Human calibration results (κ score, agreement %)
+- Contamination guard metadata: `loader_version`, `template_disabled: true`, `add_special_tokens: false`, `sentinel_tests_passed: true`
 - Timestamp
 - Test set path and size
 
