@@ -8,6 +8,65 @@
 
 ---
 
+## ⭐ Recommended: MCP Server (New)
+
+**As of October 2025**, the easiest way to use Codex reviews is via the MCP server at https://github.com/abstractionlair/mcp-servers.
+
+### Quick Start
+
+The `mcp__codex_review` tool is available in Claude Code if you have the MCP server installed (see Installation below).
+
+**Usage**:
+```python
+# Claude Code can call this directly
+mcp__codex_review(
+    prompt="""# CODEX REVIEW REQUEST: Stage 1 SFT Training Gate
+
+## Context
+Reviewing Stage 1 SFT training plan...
+
+## Review Questions
+1. Is 3,968 examples sufficient?
+2. Are hyperparameters appropriate?
+
+## Request
+GO / NO-GO for starting SFT training?""",
+    reasoning_effort="high",
+    output_file="reviews/autonomous/20251015_sft_gate.txt"
+)
+```
+
+### Installation
+
+**User scope** (available in all Claude Code projects):
+```bash
+# Install the MCP server
+cd ~/mcp-servers/mcp-servers/codex-review
+npm install
+npm run build
+
+# Add to Claude Code config
+claude mcp add --scope user --transport stdio codex \
+  bash -c 'source ~/.env && exec node ~/mcp-servers/mcp-servers/codex-review/build/index.js'
+
+# Restart Claude Code
+```
+
+**Requirements**:
+- `OPENAI_API_KEY` in `~/.env` or environment
+- `codex` CLI installed (`brew install openai/tap/codex` or similar)
+- Node.js 18+
+
+### Benefits over Bash Approach
+
+- ✅ No need to manually construct bash commands
+- ✅ Prompts sent via stdin (not visible in `ps`)
+- ✅ Automatic timeout protection (5 min default, configurable)
+- ✅ Robust error handling (won't crash on failures)
+- ✅ Consistent interface across all projects
+
+---
+
 ## Architecture
 
 ```
@@ -205,9 +264,13 @@ else:
 
 ---
 
-## Actual Usage Pattern
+## Legacy: Direct Bash Approach (Deprecated)
 
-The `codex` CLI tool accepts file input. The pattern is:
+**Note**: The MCP server approach (above) is now recommended. This section is kept for reference and pod scripts that may still use it.
+
+### Actual Usage Pattern
+
+The `codex exec` CLI command with proper authentication and model selection. **Key requirement**: API key must be in environment (from .env or `export OPENAI_API_KEY=...`).
 
 ```bash
 # 1. Write detailed review request to temp file
@@ -231,10 +294,15 @@ cat > /tmp/review_prompt.txt << 'EOF'
 GO / NO-GO / MODIFY for [decision]?
 EOF
 
-# 2. Send to Codex and save response
-codex /tmp/review_prompt.txt > reviews/autonomous/$(date +%Y%m%d_%H%M%S)_topic.txt
+# 2. Source environment (if needed) and send to Codex with reasoning
+source .env  # Ensures OPENAI_API_KEY is available
+mkdir -p reviews/autonomous
+codex exec --full-auto -m "gpt-5-codex" -c 'model_reasoning_effort="high"' \
+  -o "reviews/autonomous/$(date +%Y%m%d_%H%M%S)_topic.txt" \
+  "$(cat /tmp/review_prompt.txt)"
 
-# 3. Read and act on response
+# 3. Wait for completion (Codex writes to output file when done)
+# Then read and act on response
 cat reviews/autonomous/[newest_file].txt
 ```
 
@@ -278,7 +346,11 @@ per_device_train_batch_size = 2
 GO / NO-GO / MODIFY for starting SFT training with current configuration?
 EOF
 
-codex /tmp/sft_review_prompt.txt > reviews/autonomous/$(date +%Y%m%d_%H%M%S)_sft_training_gate.txt
+source .env
+mkdir -p reviews/autonomous
+codex exec --full-auto -m "gpt-5-codex" -c 'model_reasoning_effort="high"' \
+  -o "reviews/autonomous/$(date +%Y%m%d_%H%M%S)_sft_training_gate.txt" \
+  "$(cat /tmp/sft_review_prompt.txt)"
 ```
 
 ### Key Format Elements
@@ -289,36 +361,51 @@ codex /tmp/sft_review_prompt.txt > reviews/autonomous/$(date +%Y%m%d_%H%M%S)_sft
 4. **Timestamped output**: `$(date +%Y%m%d_%H%M%S)_topic.txt`
 5. **Saved to audit trail**: `reviews/autonomous/` directory
 
-## Configuration on Pod
+## Configuration
 
-### 1. Ensure Codex is Authenticated
+### 1. Ensure API Key is Available
 
+**Option A (Development/Local)**: Source `.env` file
 ```bash
-# On pod, authenticate Codex once
-codex login
-
-# Test it works
-codex /tmp/test.txt
+source .env  # Loads OPENAI_API_KEY from project
 ```
 
-### 2. Set Environment Variables
+**Option B (Pod/Production)**: Export environment variable
+```bash
+export OPENAI_API_KEY="sk-proj-..."  # Your OpenAI API key
+```
 
-Add to `~/.bashrc` or pod setup script:
-
+**Option C (Pod setup)**: Add to `~/.bashrc` or pod setup script
 ```bash
 # Enable autonomous Codex reviews
-export ENABLE_CODEX_REVIEWS=true
-export CODEX_MODEL="o3-mini"  # Fast, high-reasoning model
-export CODEX_TIMEOUT=300      # 5 minutes max
+export OPENAI_API_KEY="sk-proj-..."
+export CODEX_TIMEOUT=300  # 5 minutes max for reasoning
+```
+
+### 2. Test Codex is Working
+
+```bash
+# Write a simple test prompt
+cat > /tmp/test.txt << 'EOF'
+# CODEX REVIEW REQUEST: Test
+
+## Request
+Is this working?
+EOF
+
+# Call Codex (with API key in environment)
+codex exec --full-auto -m "gpt-5-codex" -c 'model_reasoning_effort="high"' \
+  -o "/tmp/codex_test_output.txt" \
+  "$(cat /tmp/test.txt)"
+
+# Check output (may take a moment while reasoning)
+cat /tmp/codex_test_output.txt
 ```
 
 ### 3. Budget Controls (Optional)
 
 ```bash
-# Limit number of reviews per session
-export MAX_CODEX_REVIEWS=10
-
-# Track usage
+# Track usage in pod setup
 export CODEX_REVIEW_LOG=/workspace/MaximalCAI/logs/codex_reviews.log
 ```
 

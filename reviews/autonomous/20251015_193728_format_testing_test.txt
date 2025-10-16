@@ -1,0 +1,11 @@
+**Review Outcome**
+- Authored `reviews/responses/20251029_stage1b_format_checks_codex.md` capturing why Stage 1B needs held-out format diagnostics, how to stage them, and extra sanity checks.
+
+**Key Points**
+- Current three-way evaluation (`specs/stage1b_conversation_eval_spec.md:382`) only probes format sensitivity on the base model; without an Instruct-side variant we could still accept a template-bound capability, repeating the Stage 1 failure noted in `docs/STAGE1_FINDINGS_AND_PIVOT.md:40-83`.
+- Folding alternate renderers into the existing calibration workflow (`specs/stage1b_conversation_eval_spec.md:360-444`) keeps κ validation intact and avoids a second scoring retrofit.
+- Two light-weight diagnostics are sufficient: (a) bare newline transcript and (b) JSON turn schema—monitor for ≥15 pp drops vs canonical before green-lighting the pivot—and archive transcripts/results for reproducibility.
+
+**Next Steps**
+1. Update the spec to define a “Format Generalisation” subsection covering the two diagnostics, their sample sizes, success thresholds, and manifest outputs.
+2. Adjust heuristics/judge prompts so calibration covers every renderer, then re-run the pilot including these checks.
